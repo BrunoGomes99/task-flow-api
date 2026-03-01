@@ -1,4 +1,4 @@
-using TaskFlow.Domain.Enums;
+using TaskFlow.Domain.SeedWork;
 using TaskFlow.Domain.Validation;
 
 namespace TaskFlow.Domain.Entities;

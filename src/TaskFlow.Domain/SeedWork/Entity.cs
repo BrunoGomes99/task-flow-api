@@ -1,4 +1,4 @@
-namespace TaskFlow.Domain.Entities;
+namespace TaskFlow.Domain.SeedWork;
 
 /// <summary>
 /// Base class for all domain entities.
