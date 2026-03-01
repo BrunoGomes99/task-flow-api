@@ -10,10 +10,10 @@ These rules apply in every phase. Verify them during implementation and code rev
 
 ### Architecture Enforcement
 
-- [ ] **Domain has zero project references** — Domain project does not reference Application, Infrastructure, or API.
-- [ ] **Application references only Domain** — No Infrastructure or API references in Application.
-- [ ] **Infrastructure references Application (and Domain via it)** — Implements interfaces defined in Application.
-- [ ] **API references Application and Infrastructure** — For DI registration and startup only; no business logic in API layer.
+- [x] **Domain has zero project references** — Domain project does not reference Application, Infrastructure, or API.
+- [x] **Application references only Domain** — No Infrastructure or API references in Application.
+- [x] **Infrastructure references Application (and Domain via it)** — Implements interfaces defined in Application.
+- [x] **API references Application and Infrastructure** — For DI registration and startup only; no business logic in API layer.
 - [ ] **Dependency Inversion** — All external concerns (repositories, auth, cache, messaging) are defined as interfaces in Application and implemented in Infrastructure.
 - [ ] **No business logic in controllers** — Controllers only map HTTP to use-case calls and return responses; validation and rules live in Application.
 
@@ -46,9 +46,9 @@ These rules apply in every phase. Verify them during implementation and code rev
 ## Phase 1 — MVP
 
 ### Solution and Projects
-
-- [ ] **Solution contains:** Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Domain`, `TaskFlow.Application`, `TaskFlow.Infrastructure`, `TaskFlow.API`, `TaskFlow.Tests` or per-layer test projects).
-- [ ] **Project references follow Clean Architecture** — Dependency graph: API → Infrastructure → Application → Domain; Tests → Application, Domain (and mocks for Infrastructure).
+cation, Infrastructure, API, and Test projects (e.g. `TaskFlow.Domain`, `TaskFlow.Application`, `TaskFlow.Infrastructure`, `TaskFlow.API`, `TaskFlow.Tests` or per-layer test projects).
+- [x] **Solution contains:** Domain, Appli
+- [x] **Project references follow Clean Architecture** — Dependency graph: API → Infrastructure → Application → Domain; Tests → Application, Domain (and mocks for Infrastructure).
 
 ### Domain Layer
 
@@ -77,7 +77,7 @@ These rules apply in every phase. Verify them during implementation and code rev
 
 - [ ] **Controllers** — Thin controllers: map request to application DTO, call use case, map result to HTTP response.
 - [ ] **Auth** — JWT bearer authentication; all Task endpoints require `[Authorize]`; UserId read from claims and passed into use cases.
-- [ ] **Health check** — `/health` (or equivalent) endpoint for Docker/orchestration; returns 200 when the app is ready.
+- [x] **Health check** — `/health` (or equivalent) endpoint for Docker/orchestration; returns 200 when the app is ready.
 - [ ] **Exception middleware** — Catches exceptions, returns consistent error payload, appropriate status code, and logs.
 - [ ] **DI registration** — All Application and Infrastructure services registered in `Program.cs`/startup; no business logic in composition root.
 
