@@ -53,7 +53,7 @@ cation, Infrastructure, API, and Test projects (e.g. `TaskFlow.Domain`, `TaskFlo
 ### Domain Layer
 
 - [ ] **User entity** — Id, Name, Email, PasswordHash, CreatedAt; no dependencies on other projects.
-- [ ] **Task entity (aggregate root)** — Id, UserId, Title, Description, Status (enum: Pending, InProgress, Completed), DueDate, CreatedAt, UpdatedAt.
+- [ ] **Task entity (aggregate root)** — Id, UserId, Title, Description, Status (enum: Pending, InProgress, Completed), DueDate, CreatedAt, UpdatedAt. Domain validation in constructor (e.g. Title required with min/max length, Description optional with max length). Status transition rules enforced via explicit methods SetPending(), SetInProgress(), SetCompleted(): Pending ↔ InProgress, Pending → Completed, InProgress → Completed; Completed is final (frontend may warn that completing cannot be undone).
 - [ ] **NotificationLog entity** — Id, TaskId, EventType, ProcessedAt (entity only; no repository or use cases in Phase 1).
 - [ ] **Domain logic only in Domain** — Any invariant or rule that belongs to the domain lives in Domain (e.g. status transitions if needed).
 

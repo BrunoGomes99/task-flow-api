@@ -71,6 +71,8 @@ The system must be simple in domain complexity but architecturally mature.
 - DueDate
 - CreatedAt
 - UpdatedAt
+- **Domain validation:** Title required (not null/empty, min and max length); Description optional with max length. Enforced in the entity constructor.
+- **Status transitions:** Allowed: Pending ↔ InProgress, Pending → Completed, InProgress → Completed. Once a task is Completed, its status cannot be changed back. Status is changed via explicit methods: SetPending(), SetInProgress(), SetCompleted(). The frontend may show a warning that completing a task cannot be undone.
 
 **NotificationLog** (Phase 1: entity only; Phase 2: full implementation)
 
