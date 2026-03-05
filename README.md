@@ -83,8 +83,8 @@ tests/
 
 ## Documentation
 
-- [Project Specification](.docs/PROJECT_SPEC.md) — Scope, domain, auth, API contract, phased plan  
-- [Engineering Guidelines](.docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
+- [Project Specification](docs/PROJECT_SPEC.md) — Scope, domain, auth, API contract, phased plan  
+- [Engineering Guidelines](docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
 
 ## License
 
