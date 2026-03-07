@@ -9,6 +9,9 @@ This document describes the approved architecture and scope for the **TaskFlow A
 Build a RESTful Web API using **.NET 10** with:
 
 - Clean Architecture
+- CQRS (Command Query Responsibility Segregation) via MediatR
+- MediatR for mediator pattern and pipeline behaviors
+- FluentValidation for input validation in the Application layer
 - SOLID principles and Clean Code practices
 - JWT authentication
 - MongoDB (NoSQL)
@@ -35,9 +38,9 @@ The system must be simple in domain complexity but architecturally mature.
 ### 3.1 Clean Architecture Layout
 
 - **Domain** — Entities, value objects, domain rules. No dependencies on other layers.
-- **Application** — Use cases, interfaces (repositories, services), DTOs, validation.
+- **Application** — Use cases (MediatR handlers), interfaces (repositories, services), DTOs, Command/Query Responsibility Segregation (CQRS), FluentValidation validators, pipeline behaviors.
 - **Infrastructure** — Implementations of external concerns: MongoDB, Redis, RabbitMQ.
-- **API** — Controllers, middleware, filters, and configuration.
+- **API** — Controllers, middleware, filters, and configuration. Controllers send Commands/Queries via `IMediator`.
 - **Tests** — Unit tests for Domain and Application.
 
 ### 3.2 Guidelines
@@ -46,6 +49,12 @@ The system must be simple in domain complexity but architecturally mature.
 - Application holds use cases and interfaces; Infrastructure implements them.
 - Strict Dependency Inversion: depend on abstractions (interfaces).
 - Use interfaces for repositories and external services.
+
+### 3.3 CQRS and MediatR
+
+- **CQRS** — Commands (writes) and Queries (reads) are separated. Each use case has a request type (e.g. `CreateTaskCommand`, `ListTasksQuery`) and a handler.
+- **MediatR** — Mediator pattern: controllers send requests via `IMediator.Send()`; handlers execute the use case logic. No direct handler injection in controllers.
+- **Pipeline behaviors** — ValidationBehavior runs FluentValidation before the handler; validation failures throw `ValidationException` (API maps to 400 Bad Request).
 
 ---
 
@@ -159,7 +168,7 @@ The system must be simple in domain complexity but architecturally mature.
 - Clean Architecture (Domain, Application, Infrastructure, API, Tests).
 - User: register, login (JWT), get profile.
 - Task: full CRUD, paginated list (PageSize max 20), filters (title, description, status), ordering by DueDate.
-- Stack: .NET 10, JWT (no Identity), BCrypt, MongoDB.
+- Stack: .NET 10, MediatR (CQRS), FluentValidation, JWT (no Identity), BCrypt, MongoDB.
 - Docker: Dockerfile + docker-compose (API + MongoDB); health checks.
 - NotificationLog: **entity only** in Domain; no repository or endpoints.
 - Tests: xUnit for Domain and Application (mocks); progressive coverage.
@@ -188,3 +197,4 @@ The system must be simple in domain complexity but architecturally mature.
 ## 13. Document History
 
 - Initial specification based on TaskFlow project plan and approved scope refinements (phases, PageSize 20, health checks, validation in Application layer).
+- Added MediatR, CQRS (Commands/Queries), and FluentValidation to architecture and Phase 1 stack.

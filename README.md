@@ -15,9 +15,10 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 |-------------|--------------|
 | Runtime     | .NET 10      |
 | API         | ASP.NET Core Web API |
+| Use cases   | MediatR, CQRS (Command and Query Responsibility Segregation) |
+| Validation  | FluentValidation (Application layer, pipeline behavior) |
 | Persistence | MongoDB      |
 | Auth        | JWT, BCrypt  |
-| Validation  | FluentValidation (Application layer) |
 | Testing     | xUnit        |
 | Quality     | SonarLint    |
 | Containers  | Docker, docker-compose |
@@ -43,7 +44,7 @@ dotnet build
 Set MongoDB connection string and JWT settings (e.g. in `appsettings.Development.json` or environment variables), then:
 
 ```bash
-dotnet run --project src/TaskFlow.API
+dotnet run --project src/TaskFlow.Api
 ```
 
 The API will listen on the configured port (e.g. `http://localhost:5000`).
@@ -64,27 +65,37 @@ dotnet test
 
 ## Project Structure
 
-Clean Architecture layout:
+Clean Architecture layout with CQRS and MediatR:
 
 ```
 src/
-  TaskFlow.Domain/        # Entities, domain rules — no external dependencies
-  TaskFlow.Application/  # Use cases, interfaces, DTOs, validation
-  TaskFlow.Infrastructure/# MongoDB, JWT, (Redis, RabbitMQ in Phase 2)
-  TaskFlow.API/            # Controllers, middleware, configuration
+  TaskFlow.Domain/           # Entities, domain rules — no external dependencies
+  TaskFlow.Application/      # Use cases (MediatR handlers), interfaces, DTOs, validation
+    DTOs/Common/             # Shared DTOs (e.g. TaskDto)
+    DTOs/Tasks/              # Commands and Queries per use case
+      CreateTask/            # CreateTaskCommand, CreateTaskCommandValidator
+      UpdateTask/
+      ListTasks/
+      ...
+    Interfaces/              # ITaskRepository, IUserRepository, etc.
+    Behaviors/               # ValidationBehavior (FluentValidation pipeline)
+    Extensions/              # AddApplicationValidation, DI registration
+  TaskFlow.Infrastructure/   # MongoDB, JWT, (Redis, RabbitMQ in Phase 2)
+  TaskFlow.Api/              # Controllers, middleware, configuration
 tests/
-  TaskFlow.Tests/          # Unit tests (Domain + Application, mocks)
+  TaskFlow.Domain.Tests/
+  TaskFlow.Application.Tests/
 ```
 
 - **Domain** → no references to other projects  
-- **Application** → references Domain only; defines repository and service interfaces  
+- **Application** → references Domain only; Commands/Queries (CQRS), FluentValidation, MediatR handlers  
 - **Infrastructure** → implements Application interfaces  
-- **API** → references Application and Infrastructure; thin controllers  
+- **API** → references Application and Infrastructure; thin controllers send requests via `IMediator`  
 
 ## Documentation
 
-- [Project Specification](.docs/PROJECT_SPEC.md) — Scope, domain, auth, API contract, phased plan  
-- [Engineering Guidelines](.docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
+- [Project Specification](docs/PROJECT_SPEC.md) — Scope, domain, auth, API contract, phased plan  
+- [Engineering Guidelines](docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
 
 ## License
 
