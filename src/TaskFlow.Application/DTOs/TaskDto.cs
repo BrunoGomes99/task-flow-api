@@ -1,6 +1,6 @@
 using TaskFlow.Domain.Enums;
 
-namespace TaskFlow.Application.DTOs.Tasks;
+namespace TaskFlow.Application.DTOs;
 
 /// <summary>
 /// Data transfer object for Task in API responses.

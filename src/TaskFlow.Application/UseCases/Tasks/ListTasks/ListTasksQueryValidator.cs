@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace TaskFlow.Application.DTOs.Tasks.ListTasks;
+namespace TaskFlow.Application.UseCases.Tasks.ListTasks;
 
 /// <summary>
 /// Validates ListTasksQuery. PageSize max 20 per spec; PageNumber >= 1; TaskId not applicable (list by UserId).

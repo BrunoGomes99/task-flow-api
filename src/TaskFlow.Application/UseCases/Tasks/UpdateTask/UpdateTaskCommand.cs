@@ -1,6 +1,6 @@
 using MediatR;
 
-namespace TaskFlow.Application.DTOs.Tasks.UpdateTask;
+namespace TaskFlow.Application.UseCases.Tasks.UpdateTask;
 
 /// <summary>
 /// Command to update a task's title and description. UserId is set by the API from JWT.

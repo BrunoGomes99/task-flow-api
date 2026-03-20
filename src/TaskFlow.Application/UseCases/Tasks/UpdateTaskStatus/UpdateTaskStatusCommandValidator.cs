@@ -1,6 +1,6 @@
 using FluentValidation;
 
-namespace TaskFlow.Application.DTOs.Tasks.UpdateTaskStatus;
+namespace TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
 
 /// <summary>
 /// Validates UpdateTaskStatusCommand. TaskId must not be empty.

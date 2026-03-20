@@ -1,6 +1,7 @@
 using MediatR;
+using TaskFlow.Application.DTOs;
 
-namespace TaskFlow.Application.DTOs.Tasks.GetTaskById;
+namespace TaskFlow.Application.UseCases.Tasks.GetTaskById;
 
 /// <summary>
 /// Query to get a single task by id. UserId is set by the API from JWT (multi-tenancy).

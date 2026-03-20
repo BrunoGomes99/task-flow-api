@@ -1,13 +1,13 @@
 using FluentValidation;
 
-namespace TaskFlow.Application.DTOs.Tasks.GetTaskById;
+namespace TaskFlow.Application.UseCases.Tasks.DeleteTask;
 
 /// <summary>
-/// Validates GetTaskByIdQuery. TaskId must not be empty.
+/// Validates DeleteTaskCommand. TaskId must not be empty.
 /// </summary>
-public sealed class GetTaskByIdQueryValidator : AbstractValidator<GetTaskByIdQuery>
+public sealed class DeleteTaskCommandValidator : AbstractValidator<DeleteTaskCommand>
 {
-    public GetTaskByIdQueryValidator()
+    public DeleteTaskCommandValidator()
     {
         RuleFor(x => x.UserId)
             .NotEmpty().WithMessage("UserId is required.");

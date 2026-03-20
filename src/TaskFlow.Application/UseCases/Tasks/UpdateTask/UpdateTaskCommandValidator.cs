@@ -1,20 +1,23 @@
 using FluentValidation;
 
-namespace TaskFlow.Application.DTOs.Tasks.CreateTask;
+namespace TaskFlow.Application.UseCases.Tasks.UpdateTask;
 
 /// <summary>
-/// Validates CreateTaskCommand. Aligns with Domain Task constraints (Title 3–200, Description max 2000).
+/// Validates UpdateTaskCommand. TaskId must not be empty. Title/Description align with Domain constraints.
 /// </summary>
-public sealed class CreateTaskCommandValidator : AbstractValidator<CreateTaskCommand>
+public sealed class UpdateTaskCommandValidator : AbstractValidator<UpdateTaskCommand>
 {
     private const int TitleMinLength = 3;
     private const int TitleMaxLength = 200;
     private const int DescriptionMaxLength = 2000;
 
-    public CreateTaskCommandValidator()
+    public UpdateTaskCommandValidator()
     {
         RuleFor(x => x.UserId)
             .NotEmpty().WithMessage("UserId is required.");
+
+        RuleFor(x => x.TaskId)
+            .NotEmpty().WithMessage("TaskId is required.");
 
         RuleFor(x => x.Title)
             .NotEmpty().WithMessage("Title is required.")

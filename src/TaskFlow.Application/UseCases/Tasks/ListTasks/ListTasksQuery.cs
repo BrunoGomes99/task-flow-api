@@ -1,9 +1,9 @@
-using TaskFlow.Application.Common;
-using TaskFlow.Application.Enums;
 using MediatR;
-using TaskFlow.Domain.Enums;
+using TaskFlow.Application.Common;
+using TaskFlow.Application.DTOs;
+using TaskFlow.Application.Enums;
 
-namespace TaskFlow.Application.DTOs.Tasks.ListTasks;
+namespace TaskFlow.Application.UseCases.Tasks.ListTasks;
 
 /// <summary>
 /// Query to list tasks with pagination, filters, and ordering. UserId is set by the API from JWT.

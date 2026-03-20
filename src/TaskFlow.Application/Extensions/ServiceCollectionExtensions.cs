@@ -3,7 +3,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using TaskFlow.Application.Behaviors;
-using TaskFlow.Application.DTOs.Tasks.CreateTask;
+using TaskFlow.Application.UseCases.Tasks.CreateTask;
 
 namespace TaskFlow.Application.Extensions;
 

@@ -71,9 +71,10 @@ Clean Architecture layout with CQRS and MediatR:
 src/
   TaskFlow.Domain/           # Entities, domain rules — no external dependencies
   TaskFlow.Application/      # Use cases (MediatR handlers), interfaces, DTOs, validation
-    DTOs/Common/             # Shared DTOs (e.g. TaskDto)
-    DTOs/Tasks/              # Commands and Queries per use case
-      CreateTask/            # CreateTaskCommand, CreateTaskCommandValidator
+    DTOs/Common/             # Shared DTOs
+    DTOs/                    # Response DTOs (e.g. TaskDto.cs)
+    UseCases/Tasks/          # Per use-case folder: command/query, validator, handler
+      CreateTask/
       UpdateTask/
       ListTasks/
       ...
