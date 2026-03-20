@@ -14,25 +14,26 @@ These rules apply in every phase. Verify them during implementation and code rev
 - [x] **Application references only Domain** — No Infrastructure or API references in Application.
 - [x] **Infrastructure references Application (and Domain via it)** — Implements interfaces defined in Application.
 - [x] **API references Application and Infrastructure** — For DI registration and startup only; no business logic in API layer.
-- [ ] **Dependency Inversion** — All external concerns (repositories, auth, cache, messaging) are defined as interfaces in Application and implemented in Infrastructure.
+- [x] **Dependency Inversion** — All external concerns (repositories, auth, cache, messaging) are defined as interfaces in Application and implemented in Infrastructure. (`ITaskRepository` in place; `IUserRepository`, `IJwtService` pending.)
+- [x] **Application cross-cutting errors** — Shared application exceptions where appropriate; e.g. `NotFoundException` in `Common/Exceptions` (resource name + optional id), used by Task handlers when a task is missing or not visible to the user.
 - [ ] **No business logic in controllers** — Controllers only map HTTP to use-case calls and return responses; validation and rules live in Application.
 
 ### Naming and Structure
 
-- [ ] **Use cases named by intent** — e.g. `RegisterUser`, `CreateTask`, `ListTasks`; one use case per operation.
-- [ ] **Repository interfaces in Application** — e.g. `IUserRepository`, `ITaskRepository`; implementations in Infrastructure.
-- [ ] **DTOs/requests in Application** — Commands, queries, and response DTOs live in Application; API maps to/from them.
-- [ ] **Consistent namespaces** — Match folder structure; e.g. `TaskFlow.Domain`, `TaskFlow.Application.UseCases.Tasks`.
+- [x] **Use cases named by intent** — e.g. `CreateTaskCommand`, `ListTasksQuery`; one command/query per operation (CQRS via MediatR).
+- [x] **Repository interfaces in Application** — e.g. `IUserRepository`, `ITaskRepository`; implementations in Infrastructure. (ITaskRepository done.)
+- [x] **DTOs vs use cases in Application** — Response DTOs live under `DTOs/` (e.g. `DTOs/TaskDto.cs` → namespace `TaskFlow.Application.DTOs`). Commands, queries, validators, and MediatR handlers live under `UseCases/<Area>/<UseCaseName>/` (e.g. `UseCases/Tasks/CreateTask/` → `TaskFlow.Application.UseCases.Tasks.CreateTask`). API maps HTTP to commands/queries and maps DTOs to responses.
+- [x] **Consistent namespaces** — Match folder structure; e.g. `TaskFlow.Application.UseCases.Tasks.CreateTask`, `TaskFlow.Application.DTOs`, `TaskFlow.Application.Behaviors`.
 
 ### Validation and Security
 
-- [ ] **Validation in Application layer** — Use FluentValidation (or equivalent) in Application; controllers do not perform validation logic.
+- [x] **Validation in Application layer** — FluentValidation validators for commands/queries; ValidationBehavior in MediatR pipeline runs validators before handlers.
 - [ ] **UserId from JWT only** — Never read UserId from body, query, or route for authorization; always from `sub` (or equivalent) claim.
-- [ ] **Multi-tenancy in use cases** — Every task operation receives UserId from the authenticated context and filters/checks by it in the use case or repository.
+- [x] **Multi-tenancy in use cases (Task)** — Every Task command/query carries `UserId`; `ITaskRepository` is scoped by user (e.g. `GetByIdAsync(userId, taskId, …)`). **API layer (pending):** controllers must pass `UserId` from JWT `sub` only, not from the client body.
 
 ### API and HTTP
 
-- [ ] **PageSize cap enforced** — Paginated list endpoints enforce a maximum PageSize of **20** (validation or constant in Application).
+- [x] **PageSize cap enforced** — `ListTasksQueryValidator` caps `PageSize` at **20**; API list endpoint must honor the same when exposed.
 - [ ] **Sensible HTTP status codes** — 200/201 for success, 400 for validation, 401 for unauthenticated, 403 for forbidden, 404 for not found, 500 for unexpected errors.
 - [ ] **Global exception middleware** — Unhandled exceptions are caught and returned as a consistent error response; no stack traces in non-development.
 
@@ -46,24 +47,24 @@ These rules apply in every phase. Verify them during implementation and code rev
 ## Phase 1 — MVP
 
 ### Solution and Projects
-cation, Infrastructure, API, and Test projects (e.g. `TaskFlow.Domain`, `TaskFlow.Application`, `TaskFlow.Infrastructure`, `TaskFlow.API`, `TaskFlow.Tests` or per-layer test projects).
-- [x] **Solution contains:** Domain, Appli
+Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Domain`, `TaskFlow.Application`, `TaskFlow.Infrastructure`, `TaskFlow.API`, `TaskFlow.Tests` or per-layer test projects).
+- [x] **Solution contains:** Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Domain`, `TaskFlow.Application`, `TaskFlow.Infrastructure`, `TaskFlow.API`, `TaskFlow.Tests` or per-layer test projects).
 - [x] **Project references follow Clean Architecture** — Dependency graph: API → Infrastructure → Application → Domain; Tests → Application, Domain (and mocks for Infrastructure).
 
 ### Domain Layer
 
 - [ ] **User entity** — Id, Name, Email, PasswordHash, CreatedAt; no dependencies on other projects.
-- [ ] **Task entity (aggregate root)** — Id, UserId, Title, Description, Status (enum: Pending, InProgress, Completed), DueDate, CreatedAt, UpdatedAt.
+- [x] **Task entity (aggregate root)** — Id, UserId, Title, Description, Status (enum: Pending, InProgress, Completed), DueDate, CreatedAt, UpdatedAt. Domain validation in constructor (title/description length). Status transitions via `SetPending()`, `SetInProgress()`, `SetCompleted()` with rules as specified; `Completed` is final.
 - [ ] **NotificationLog entity** — Id, TaskId, EventType, ProcessedAt (entity only; no repository or use cases in Phase 1).
-- [ ] **Domain logic only in Domain** — Any invariant or rule that belongs to the domain lives in Domain (e.g. status transitions if needed).
+- [x] **Domain logic only in Domain (Task)** — Task invariants and status transitions live in `TaskFlow.Domain` (e.g. `Entities/Task.cs`).
 
 ### Application Layer
 
 - [ ] **User use cases** — RegisterUser, LoginUser (returns JWT), GetCurrentUserProfile; each with clear request/response or DTO.
-- [ ] **Task use cases** — CreateTask, GetTaskById, ListTasks (paginated, filtered, ordered), UpdateTask, UpdateTaskStatus (PATCH), DeleteTask.
-- [ ] **Interfaces** — IUserRepository, ITaskRepository, IJwtService (or IAuthService), plus any other external dependency as interface.
-- [ ] **Validation** — FluentValidation validators for commands/queries (e.g. CreateTaskValidator); validators registered and executed in pipeline or use case.
-- [ ] **Pagination** — ListTasks accepts PageNumber, PageSize (max 20), optional filters (title, description, status), and DueDate order (ASC/DESC).
+- [x] **Task use cases** — Implemented with MediatR under `UseCases/Tasks/<UseCase>/`: CreateTask, GetTaskById, ListTasks (paginated, filtered, ordered by due date), UpdateTask, UpdateTaskStatus, DeleteTask; each with command/query, FluentValidation validator, and handler.
+- [x] **Interfaces** — IUserRepository, ITaskRepository, IJwtService (or IAuthService), plus any other external dependency as interface. (ITaskRepository done.)
+- [x] **Validation** — FluentValidation validators for commands/queries (e.g. CreateTaskCommandValidator); ValidationBehavior in MediatR pipeline; validators registered via AddApplicationValidation.
+- [x] **Pagination** — `ListTasksQuery` / `ListTasksQueryValidator` in `UseCases/Tasks/ListTasks/`: PageNumber, PageSize (max 20), optional filters (title, description, status), DueDate order (ASC/DESC).
 
 ### Infrastructure Layer
 
@@ -79,14 +80,14 @@ cation, Infrastructure, API, and Test projects (e.g. `TaskFlow.Domain`, `TaskFlo
 - [ ] **Auth** — JWT bearer authentication; all Task endpoints require `[Authorize]`; UserId read from claims and passed into use cases.
 - [x] **Health check** — `/health` (or equivalent) endpoint for Docker/orchestration; returns 200 when the app is ready.
 - [ ] **Exception middleware** — Catches exceptions, returns consistent error payload, appropriate status code, and logs.
-- [ ] **DI registration** — All Application and Infrastructure services registered in `Program.cs`/startup; no business logic in composition root.
+- [x] **DI registration** — All Application and Infrastructure services registered in `Program.cs`/startup; no business logic in composition root. (MediatR, AddApplicationValidation registered; Infrastructure pending.)
 
 ### Testing (Phase 1)
 
-- [ ] **Domain tests** — Unit tests for domain entities/values and any domain rules.
-- [ ] **Application tests** — Unit tests for use cases with mocked IUserRepository, ITaskRepository, IJwtService, etc.; progressive coverage (no need to cover every use case on day one).
-- [ ] **No infrastructure in unit tests** — Repositories and external services are mocks; no real MongoDB or HTTP in unit tests.
-- [ ] **xUnit** — Test project uses xUnit; tests are deterministic and fast.
+- [ ] **Domain tests** — Unit tests for domain entities/values and any domain rules. *(Test project exists; Task domain rules not covered yet.)*
+- [x] **Application tests (Task)** — `TaskUseCasesTests` exercises Task handlers with an in-memory `ITaskRepository`; progressive coverage for other domains later.
+- [x] **No infrastructure in unit tests** — Task application tests use in-memory/mocked repository; no real MongoDB or HTTP.
+- [x] **xUnit** — `TaskFlow.Application.Tests` and `TaskFlow.Domain.Tests` use xUnit.
 
 ### Docker and Environment (Phase 1)
 
