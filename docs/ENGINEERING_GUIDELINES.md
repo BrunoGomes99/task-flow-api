@@ -14,14 +14,14 @@ These rules apply in every phase. Verify them during implementation and code rev
 - [x] **Application references only Domain** — No Infrastructure or API references in Application.
 - [x] **Infrastructure references Application (and Domain via it)** — Implements interfaces defined in Application.
 - [x] **API references Application and Infrastructure** — For DI registration and startup only; no business logic in API layer.
-- [x] **Dependency Inversion** — All external concerns (repositories, auth, cache, messaging) are defined as interfaces in Application and implemented in Infrastructure. (`ITaskRepository` in place; `IUserRepository`, `IJwtService` pending.)
+- [x] **Dependency Inversion** — All external concerns (repositories, auth, cache, messaging) are defined as interfaces in Application and implemented in Infrastructure. (`ITaskRepository` in place; `IUserRepository`, `IJwtService`, `IPasswordHasher` interfaces defined; MongoDB/JWT/BCrypt implementations pending.)
 - [x] **Application cross-cutting errors** — Shared application exceptions where appropriate; e.g. `NotFoundException` in `Common/Exceptions` (resource name + optional id), used by Task handlers when a task is missing or not visible to the user.
 - [ ] **No business logic in controllers** — Controllers only map HTTP to use-case calls and return responses; validation and rules live in Application.
 
 ### Naming and Structure
 
 - [x] **Use cases named by intent** — e.g. `CreateTaskCommand`, `ListTasksQuery`; one command/query per operation (CQRS via MediatR).
-- [x] **Repository interfaces in Application** — e.g. `IUserRepository`, `ITaskRepository`; implementations in Infrastructure. (ITaskRepository done.)
+- [x] **Repository interfaces in Application** — e.g. `IUserRepository`, `ITaskRepository`; implementations in Infrastructure. (`ITaskRepository` implemented in tests; MongoDB repos pending.)
 - [x] **DTOs vs use cases in Application** — Response DTOs live under `DTOs/` (e.g. `DTOs/TaskDto.cs` → namespace `TaskFlow.Application.DTOs`). Commands, queries, validators, and MediatR handlers live under `UseCases/<Area>/<UseCaseName>/` (e.g. `UseCases/Tasks/CreateTask/` → `TaskFlow.Application.UseCases.Tasks.CreateTask`). API maps HTTP to commands/queries and maps DTOs to responses.
 - [x] **Consistent namespaces** — Match folder structure; e.g. `TaskFlow.Application.UseCases.Tasks.CreateTask`, `TaskFlow.Application.DTOs`, `TaskFlow.Application.Behaviors`.
 
@@ -60,9 +60,9 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Application Layer
 
-- [ ] **User use cases** — RegisterUser, LoginUser (returns JWT), GetCurrentUserProfile; each with clear request/response or DTO.
+- [x] **User use cases** — RegisterUser, LoginUser (returns JWT + ExpiresIn), GetCurrentUserProfile under `UseCases/User/<UseCase>/` (command/query, validator, handler); API wiring pending.
 - [x] **Task use cases** — Implemented with MediatR under `UseCases/Tasks/<UseCase>/`: CreateTask, GetTaskById, ListTasks (paginated, filtered, ordered by due date), UpdateTask, UpdateTaskStatus, DeleteTask; each with command/query, FluentValidation validator, and handler.
-- [x] **Interfaces** — IUserRepository, ITaskRepository, IJwtService (or IAuthService), plus any other external dependency as interface. (ITaskRepository done.)
+- [x] **Interfaces** — IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, plus any other external dependency as interface. (`ITaskRepository` implemented in tests; persistence + JWT + BCrypt implementations in Infrastructure pending.)
 - [x] **Validation** — FluentValidation validators for commands/queries (e.g. CreateTaskCommandValidator); ValidationBehavior in MediatR pipeline; validators registered via AddApplicationValidation.
 - [x] **Pagination** — `ListTasksQuery` / `ListTasksQueryValidator` in `UseCases/Tasks/ListTasks/`: PageNumber, PageSize (max 20), optional filters (title, description, status), DueDate order (ASC/DESC).
 
@@ -85,7 +85,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 ### Testing (Phase 1)
 
 - [ ] **Domain tests** — Unit tests for domain entities/values and any domain rules.
-- [ ] **Application tests** — Unit tests for use cases with mocked IUserRepository, ITaskRepository, IJwtService, etc.; progressive coverage (no need to cover every use case on day one).
+- [ ] **Application tests** — Unit tests for use cases with mocked IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, etc.; progressive coverage (no need to cover every use case on day one).
 - [ ] **No infrastructure in unit tests** — Repositories and external services are mocks; no real MongoDB or HTTP in unit tests.
 - [ ] **xUnit** — Test project uses xUnit; tests are deterministic and fast.
 
