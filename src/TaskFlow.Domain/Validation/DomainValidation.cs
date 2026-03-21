@@ -6,6 +6,17 @@ namespace TaskFlow.Domain.Validation;
 public static class DomainValidation
 {
     /// <summary>
+    /// Ensures the reference is not null. Does not reject empty or whitespace-only strings.
+    /// </summary>
+    /// <param name="value">Value to validate.</param>
+    /// <param name="paramName">Parameter name (for exception message).</param>
+    /// <exception cref="ArgumentNullException">When <paramref name="value"/> is null.</exception>
+    public static void NotNull(string? value, string paramName)
+    {
+        ArgumentNullException.ThrowIfNull(value, paramName);
+    }
+
+    /// <summary>
     /// Ensures the value is not null, empty, or whitespace-only.
     /// </summary>
     /// <param name="value">Value to validate.</param>
