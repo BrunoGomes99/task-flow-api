@@ -55,7 +55,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 - [ ] **User entity** — Id, Name, Email, PasswordHash, CreatedAt; no dependencies on other projects.
 - [x] **Task entity (aggregate root)** — Id, UserId, Title, Description, Status (enum: Pending, InProgress, Completed), DueDate, CreatedAt, UpdatedAt. Domain validation in constructor (title/description length). Status transitions via `SetPending()`, `SetInProgress()`, `SetCompleted()` with rules as specified; `Completed` is final.
-- [ ] **NotificationLog entity** — Id, TaskId, EventType, ProcessedAt (entity only; no repository or use cases in Phase 1).
+- [x] **NotificationLog entity** — Id, TaskId, EventType, ProcessedAt (entity only; no repository or use cases in Phase 1).
 - [ ] **Domain logic only in Domain** — Any invariant or rule that belongs to the domain lives in Domain (e.g. status transitions if needed).
 
 ### Application Layer
@@ -84,10 +84,10 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Testing (Phase 1)
 
-- [x] **Domain tests** — Unit tests for domain entities/values and any domain rules (e.g. User, NotificationLog; expand for Task/Email as needed).
-- [x] **Application tests** — Unit tests for use cases with mocked IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, etc.; progressive coverage (Task and User handlers covered; extend as new use cases land).
-- [ ] **No infrastructure in unit tests** — Repositories and external services are mocks; no real MongoDB or HTTP in unit tests.
-- [ ] **xUnit** — Test project uses xUnit; tests are deterministic and fast.
+- [x] **Domain tests** — Unit tests for domain entities/values and any domain rules.
+- [x] **Application tests** — Unit tests for use cases with mocked IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, etc.; progressive coverage (no need to cover every use case on day one).
+- [x] **No infrastructure in unit tests** — Repositories and external services are mocks; no real MongoDB or HTTP in unit tests.
+- [x] **xUnit** — Test project uses xUnit; tests are deterministic and fast.
 
 ### Docker and Environment (Phase 1)
 
