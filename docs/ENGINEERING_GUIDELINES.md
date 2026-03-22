@@ -84,8 +84,8 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Testing (Phase 1)
 
-- [ ] **Domain tests** — Unit tests for domain entities/values and any domain rules.
-- [ ] **Application tests** — Unit tests for use cases with mocked IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, etc.; progressive coverage (no need to cover every use case on day one).
+- [x] **Domain tests** — Unit tests for domain entities/values and any domain rules (e.g. User, NotificationLog; expand for Task/Email as needed).
+- [x] **Application tests** — Unit tests for use cases with mocked IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, etc.; progressive coverage (Task and User handlers covered; extend as new use cases land).
 - [ ] **No infrastructure in unit tests** — Repositories and external services are mocks; no real MongoDB or HTTP in unit tests.
 - [ ] **xUnit** — Test project uses xUnit; tests are deterministic and fast.
 
