@@ -97,9 +97,11 @@ The system must be simple in domain complexity but architecturally mature.
 - Implement JWT manually; do **not** use ASP.NET Identity.
 - Hash passwords (e.g. BCrypt).
 - JWT must include UserId as claim (`sub`).
+- **Login response:** returns the access token (`AccessToken`) and **`ExpiresIn`** (seconds until expiry), aligned with the JWT’s configured lifetime so clients can schedule renewal without decoding the token.
 - All Task endpoints require authentication.
 - Multi-tenancy: each user accesses only their own tasks (by UserId).
 - UserId must always come from the JWT, never from request body or query.
+- **Refresh tokens** are **out of scope** for Phase 1; they may be introduced in a later version without changing the core login contract beyond additive fields (see Risks).
 
 ---
 
@@ -108,7 +110,7 @@ The system must be simple in domain complexity but architecturally mature.
 ### User
 
 1. Register user
-2. Login (returns JWT)
+2. Login (returns JWT access token and `ExpiresIn` in seconds)
 3. Get authenticated user profile
 
 ### Task
@@ -166,7 +168,7 @@ The system must be simple in domain complexity but architecturally mature.
 ### Phase 1 — MVP
 
 - Clean Architecture (Domain, Application, Infrastructure, API, Tests).
-- User: register, login (JWT), get profile.
+- User: register, login (JWT + `ExpiresIn`), get profile.
 - Task: full CRUD, paginated list (PageSize max 20), filters (title, description, status), ordering by DueDate.
 - Stack: .NET 10, MediatR (CQRS), FluentValidation, JWT (no Identity), BCrypt, MongoDB.
 - Docker: Dockerfile + docker-compose (API + MongoDB); health checks.
@@ -190,7 +192,8 @@ The system must be simple in domain complexity but architecturally mature.
 ## 12. Risks and Considerations
 
 - Define MongoDB repositories and indexes (UserId, UserId + DueDate) early in Phase 1.
-- JWT is manual; if refresh or revocation is added later, extend the design without breaking existing contracts.
+- JWT is manual; **`ExpiresIn`** must match the signing configuration (same lifetime as the `exp` claim) so clients are not misled.
+- **Refresh tokens / revocation:** not in Phase 1; a future version may add refresh flows and storage—extend the API additively (e.g. optional `refresh_token` field) so existing clients keep working.
 
 ---
 
@@ -198,3 +201,4 @@ The system must be simple in domain complexity but architecturally mature.
 
 - Initial specification based on TaskFlow project plan and approved scope refinements (phases, PageSize 20, health checks, validation in Application layer).
 - Added MediatR, CQRS (Commands/Queries), and FluentValidation to architecture and Phase 1 stack.
+- Login response: documented `ExpiresIn` (seconds); refresh tokens explicitly deferred to a later version.
