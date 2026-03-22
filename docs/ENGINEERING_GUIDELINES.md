@@ -84,7 +84,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Testing (Phase 1)
 
-- [ ] **Domain tests** — Unit tests for domain entities/values and any domain rules. *(Test project exists; Task domain rules not covered yet.)*
+- [x] **Domain tests** — Unit tests for domain entities/values and any domain rules. *(Task aggregate; add User/Email/NotificationLog when present on branch.)*
 - [x] **Application tests (Task)** — `TaskUseCasesTests` exercises Task handlers with an in-memory `ITaskRepository`; progressive coverage for other domains later.
 - [x] **No infrastructure in unit tests** — Task application tests use in-memory/mocked repository; no real MongoDB or HTTP.
 - [x] **xUnit** — `TaskFlow.Application.Tests` and `TaskFlow.Domain.Tests` use xUnit.
