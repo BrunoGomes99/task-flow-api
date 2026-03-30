@@ -8,5 +8,6 @@
   <Folder Name="/tests/">
     <Project Path="tests/TaskFlow.Application.Tests/TaskFlow.Application.Tests.csproj" />
     <Project Path="tests/TaskFlow.Domain.Tests/TaskFlow.Domain.Tests.csproj" />
+    <Project Path="tests/TaskFlow.Infrastructure.Tests/TaskFlow.Infrastructure.Tests.csproj" />
   </Folder>
 </Solution>
