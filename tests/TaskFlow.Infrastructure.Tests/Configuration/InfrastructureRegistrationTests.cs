@@ -6,6 +6,7 @@ using TaskFlow.Infrastructure.Configuration;
 using TaskFlow.Infrastructure.Extensions;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
+using TaskFlow.Infrastructure.Security;
 
 namespace TaskFlow.Infrastructure.Tests.Configuration;
 
@@ -19,7 +20,11 @@ public sealed class InfrastructureRegistrationTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 [$"{MongoDbSettings.SectionName}:ConnectionString"] = runner.ConnectionString,
-                [$"{MongoDbSettings.SectionName}:DatabaseName"] = $"taskflow-di-{Guid.NewGuid():N}"
+                [$"{MongoDbSettings.SectionName}:DatabaseName"] = $"taskflow-di-{Guid.NewGuid():N}",
+                [$"{JwtSettings.SectionName}:Secret"] = "TaskFlow_DI_Test_Secret_AtLeast32BytesLong!",
+                [$"{JwtSettings.SectionName}:Issuer"] = "TaskFlow.DI",
+                [$"{JwtSettings.SectionName}:Audience"] = "TaskFlow.Api.DI",
+                [$"{JwtSettings.SectionName}:AccessTokenLifetimeSeconds"] = "3600"
             })
             .Build();
 
@@ -33,5 +38,7 @@ public sealed class InfrastructureRegistrationTests
         Assert.IsType<UserRepository>(provider.GetRequiredService<IUserRepository>());
         Assert.IsType<TaskRepository>(provider.GetRequiredService<ITaskRepository>());
         Assert.NotNull(provider.GetRequiredService<MongoIndexesInitializer>());
+        Assert.IsType<BCryptPasswordHasher>(provider.GetRequiredService<IPasswordHasher>());
+        Assert.IsType<JwtService>(provider.GetRequiredService<IJwtService>());
     }
 }
