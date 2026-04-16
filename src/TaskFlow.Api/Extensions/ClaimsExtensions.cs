@@ -16,7 +16,7 @@ public static class ClaimsExtensions
             ?? user.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (string.IsNullOrEmpty(sub) || !Guid.TryParse(sub, out var userId))
-            throw new InvalidOperationException("The access token is missing a valid 'sub' claim.");
+            throw new UnauthorizedAccessException("The access token is missing a valid 'sub' claim.");
 
         return userId;
     }

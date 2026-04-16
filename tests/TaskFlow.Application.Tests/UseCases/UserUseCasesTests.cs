@@ -1,3 +1,4 @@
+using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.UseCases.User.GetCurrentUserProfile;
 using TaskFlow.Application.UseCases.User.LoginUser;
@@ -36,7 +37,7 @@ public sealed class UserUseCasesTests
         await repository.AddAsync(existing, CancellationToken.None);
         var handler = new RegisterUserCommandHandler(repository, PasswordHasher);
 
-        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => handler.Handle(
+        var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(
             new RegisterUserCommand("Other", "taken@example.com", "password12"),
             CancellationToken.None));
 

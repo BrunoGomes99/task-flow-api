@@ -1,4 +1,5 @@
 using MediatR;
+using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Domain.ValueObjects;
 using DomainUser = TaskFlow.Domain.Entities.User;
@@ -24,7 +25,7 @@ public sealed class RegisterUserCommandHandler : IRequestHandler<RegisterUserCom
         var email = Email.Create(request.Email);
 
         if (await _userRepository.ExistsByEmailAsync(email, cancellationToken))
-            throw new InvalidOperationException("This email is already registered.");
+            throw new ConflictException("User", "This email is already registered.");
 
         var passwordHash = _passwordHasher.Hash(request.Password);
         var user = new DomainUser(request.Name, request.Email, passwordHash);

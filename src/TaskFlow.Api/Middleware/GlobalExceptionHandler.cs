@@ -2,6 +2,7 @@ using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using TaskFlow.Application.Common.Exceptions;
+using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Api.Middleware;
 
@@ -49,6 +50,30 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
                     Status = StatusCodes.Status404NotFound,
                 });
 
+            case ConflictException cx:
+                return (StatusCodes.Status409Conflict, new ProblemDetails
+                {
+                    Title = "Conflict",
+                    Detail = cx.Message,
+                    Status = StatusCodes.Status409Conflict,
+                });
+
+            case BusinessRuleViolationException br:
+                return (StatusCodes.Status409Conflict, new ProblemDetails
+                {
+                    Title = "Conflict",
+                    Detail = br.Message,
+                    Status = StatusCodes.Status409Conflict,
+                });
+
+            case TaskStatusTransitionException tst:
+                return (StatusCodes.Status409Conflict, new ProblemDetails
+                {
+                    Title = "Conflict",
+                    Detail = tst.Message,
+                    Status = StatusCodes.Status409Conflict,
+                });
+
             case UnauthorizedAccessException ua:
                 return (StatusCodes.Status401Unauthorized, new ProblemDetails
                 {
@@ -57,21 +82,11 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
                     Status = StatusCodes.Status401Unauthorized,
                 });
 
-            case InvalidOperationException io:
-                var conflict = io.Message.Contains("already registered", StringComparison.OrdinalIgnoreCase);
-                var status = conflict ? StatusCodes.Status409Conflict : StatusCodes.Status400BadRequest;
-                return (status, new ProblemDetails
-                {
-                    Title = conflict ? "Conflict" : "Bad request",
-                    Detail = io.Message,
-                    Status = status,
-                });
-
-            case ArgumentOutOfRangeException aor:
+            case ArgumentException ae:
                 return (StatusCodes.Status400BadRequest, new ProblemDetails
                 {
                     Title = "Bad request",
-                    Detail = aor.Message,
+                    Detail = ae.Message,
                     Status = StatusCodes.Status400BadRequest,
                 });
 

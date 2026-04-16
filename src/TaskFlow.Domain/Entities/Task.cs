@@ -1,3 +1,4 @@
+using TaskFlow.Domain.Exceptions;
 using TaskFlow.Domain.SeedWork;
 using TaskFlow.Domain.Validation;
 
@@ -44,11 +45,11 @@ public class Task : AggregateRoot
     /// <summary>
     /// Sets the task status to Pending. Only allowed when current status is InProgress.
     /// </summary>
-    /// <exception cref="InvalidOperationException">When the transition from current status is not allowed.</exception>
+    /// <exception cref="TaskStatusTransitionException">When the transition from current status is not allowed.</exception>
     public void SetPending()
     {
         if (Status != Enums.TaskStatus.InProgress)
-            throw new InvalidOperationException(
+            throw new TaskStatusTransitionException(
                 $"Cannot set status to Pending from {Status}. Only InProgress tasks can be set back to Pending.");
 
         Status = Enums.TaskStatus.Pending;
@@ -59,11 +60,11 @@ public class Task : AggregateRoot
     /// <summary>
     /// Sets the task status to InProgress. Only allowed when current status is Pending.
     /// </summary>
-    /// <exception cref="InvalidOperationException">When the transition from current status is not allowed.</exception>
+    /// <exception cref="TaskStatusTransitionException">When the transition from current status is not allowed.</exception>
     public void SetInProgress()
     {
         if (Status != Enums.TaskStatus.Pending)
-            throw new InvalidOperationException(
+            throw new TaskStatusTransitionException(
                 $"Cannot set status to InProgress from {Status}. Only Pending tasks can be set to InProgress.");
 
         Status = Enums.TaskStatus.InProgress;
@@ -74,14 +75,14 @@ public class Task : AggregateRoot
     /// <summary>
     /// Sets the task status to Completed. Only allowed when current status is Pending or InProgress. Completing a task cannot be undone.
     /// </summary>
-    /// <exception cref="InvalidOperationException">When the task is already Completed or the transition is not allowed.</exception>
+    /// <exception cref="TaskStatusTransitionException">When the task is already Completed or the transition is not allowed.</exception>
     public void SetCompleted()
     {
         if (Status == Enums.TaskStatus.Completed)
-            throw new InvalidOperationException("Task is already completed. Completing a task cannot be undone.");
+            throw new TaskStatusTransitionException("Task is already completed. Completing a task cannot be undone.");
 
         if (Status != Enums.TaskStatus.Pending && Status != Enums.TaskStatus.InProgress)
-            throw new InvalidOperationException($"Cannot set status to Completed from {Status}.");
+            throw new TaskStatusTransitionException($"Cannot set status to Completed from {Status}.");
 
         Status = Enums.TaskStatus.Completed;
         UpdatedAt = DateTime.UtcNow;

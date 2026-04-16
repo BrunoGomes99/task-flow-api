@@ -1,12 +1,14 @@
 using MediatR;
 using TaskFlow.Application.Common.Exceptions;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Domain.Exceptions;
 using DomainTaskStatus = TaskFlow.Domain.Enums.TaskStatus;
 
 namespace TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
 
 /// <summary>
 /// Handles task status transitions using domain methods.
+/// Invalid transitions throw <see cref="TaskStatusTransitionException"/> and are mapped to HTTP 409 in the API.
 /// </summary>
 public sealed class UpdateTaskStatusCommandHandler : IRequestHandler<UpdateTaskStatusCommand>
 {
