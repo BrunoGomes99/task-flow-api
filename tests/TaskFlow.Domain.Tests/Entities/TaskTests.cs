@@ -1,5 +1,6 @@
 using DomainTask = TaskFlow.Domain.Entities.Task;
 using DomainTaskStatus = TaskFlow.Domain.Enums.TaskStatus;
+using TaskFlow.Domain.Exceptions;
 
 namespace TaskFlow.Domain.Tests.Entities;
 
@@ -85,7 +86,7 @@ public sealed class TaskTests
     {
         var task = new DomainTask(UserId, "ABC", null, DomainTaskStatus.InProgress, null);
 
-        Assert.Throws<InvalidOperationException>(() => task.SetInProgress());
+        Assert.Throws<TaskStatusTransitionException>(() => task.SetInProgress());
     }
 
     [Fact]
@@ -104,7 +105,7 @@ public sealed class TaskTests
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        Assert.Throws<InvalidOperationException>(() => task.SetPending());
+        Assert.Throws<TaskStatusTransitionException>(() => task.SetPending());
     }
 
     [Fact]
@@ -135,7 +136,7 @@ public sealed class TaskTests
 
         task.SetCompleted();
 
-        Assert.Throws<InvalidOperationException>(() => task.SetCompleted());
+        Assert.Throws<TaskStatusTransitionException>(() => task.SetCompleted());
     }
 
     [Fact]
