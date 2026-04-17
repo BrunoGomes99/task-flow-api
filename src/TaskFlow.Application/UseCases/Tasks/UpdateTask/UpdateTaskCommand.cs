@@ -1,4 +1,5 @@
 using MediatR;
+using TaskFlow.Application.Common.Results;
 
 namespace TaskFlow.Application.UseCases.Tasks.UpdateTask;
 
@@ -9,4 +10,4 @@ public sealed record UpdateTaskCommand(
     Guid UserId,
     Guid TaskId,
     string Title,
-    string? Description) : IRequest;
+    string? Description) : IRequest<Result>;

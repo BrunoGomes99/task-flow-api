@@ -1,4 +1,5 @@
-using TaskFlow.Domain.Exceptions;
+using System.Collections.Frozen;
+using System.Collections.Generic;
 using TaskFlow.Domain.SeedWork;
 using TaskFlow.Domain.Validation;
 
@@ -13,6 +14,16 @@ public class Task : AggregateRoot
     private const int TitleMinLength = 3;
     private const int TitleMaxLength = 200;
     private const int DescriptionMaxLength = 2000;
+
+    private static readonly FrozenDictionary<Enums.TaskStatus, FrozenSet<Enums.TaskStatus>> AllowedTransitions =
+        new Dictionary<Enums.TaskStatus, Enums.TaskStatus[]>
+        {
+            [Enums.TaskStatus.Pending] = [Enums.TaskStatus.InProgress, Enums.TaskStatus.Completed],
+            [Enums.TaskStatus.InProgress] = [Enums.TaskStatus.Pending, Enums.TaskStatus.Completed],
+            [Enums.TaskStatus.Completed] = [],
+        }.ToFrozenDictionary(
+            kvp => kvp.Key,
+            kvp => kvp.Value.ToFrozenSet());
 
     public Guid UserId { get; private set; }
     public string Title { get; private set; } = string.Empty;
@@ -43,50 +54,16 @@ public class Task : AggregateRoot
     }
 
     /// <summary>
-    /// Sets the task status to Pending. Only allowed when current status is InProgress.
+    /// Applies a status transition when allowed by aggregate rules. Single entry point for status changes.
     /// </summary>
-    /// <exception cref="TaskStatusTransitionException">When the transition from current status is not allowed.</exception>
-    public void SetPending()
+    /// <returns><c>true</c> when the aggregate is already in <paramref name="target"/> (idempotent) or when the transition was applied; <c>false</c> when the transition is not allowed.</returns>
+    public bool TryChangeStatusTo(Enums.TaskStatus target, out string failureMessage)
     {
-        if (Status != Enums.TaskStatus.InProgress)
-            throw new TaskStatusTransitionException(
-                $"Cannot set status to Pending from {Status}. Only InProgress tasks can be set back to Pending.");
+        if (!ValidateTransitionTo(target, out failureMessage))
+            return false;
 
-        Status = Enums.TaskStatus.Pending;
-        UpdatedAt = DateTime.UtcNow;
-        Validate(Title, Description);
-    }
-
-    /// <summary>
-    /// Sets the task status to InProgress. Only allowed when current status is Pending.
-    /// </summary>
-    /// <exception cref="TaskStatusTransitionException">When the transition from current status is not allowed.</exception>
-    public void SetInProgress()
-    {
-        if (Status != Enums.TaskStatus.Pending)
-            throw new TaskStatusTransitionException(
-                $"Cannot set status to InProgress from {Status}. Only Pending tasks can be set to InProgress.");
-
-        Status = Enums.TaskStatus.InProgress;
-        UpdatedAt = DateTime.UtcNow;
-        Validate(Title, Description);
-    }
-
-    /// <summary>
-    /// Sets the task status to Completed. Only allowed when current status is Pending or InProgress. Completing a task cannot be undone.
-    /// </summary>
-    /// <exception cref="TaskStatusTransitionException">When the task is already Completed or the transition is not allowed.</exception>
-    public void SetCompleted()
-    {
-        if (Status == Enums.TaskStatus.Completed)
-            throw new TaskStatusTransitionException("Task is already completed. Completing a task cannot be undone.");
-
-        if (Status != Enums.TaskStatus.Pending && Status != Enums.TaskStatus.InProgress)
-            throw new TaskStatusTransitionException($"Cannot set status to Completed from {Status}.");
-
-        Status = Enums.TaskStatus.Completed;
-        UpdatedAt = DateTime.UtcNow;
-        Validate(Title, Description);
+        CommitTransitionTo(target);
+        return true;
     }
 
     /// <summary>
@@ -97,11 +74,55 @@ public class Task : AggregateRoot
     public void Update(string title, string? description)
     {
         description ??= string.Empty;
+        Validate(Title, Description);
 
         Title = title;
         Description = description;
         UpdatedAt = DateTime.UtcNow;
+    }
+
+    private bool ValidateTransitionTo(Enums.TaskStatus target, out string failureMessage)
+    {
+        if (Status == Enums.TaskStatus.Completed)
+        {
+            failureMessage = "Task is already completed. Completing a task cannot be undone.";
+            return false;
+        }
+
+        if (Status == target)
+        {
+            failureMessage = string.Empty;
+            return true;
+        }
+
+        if (!AllowedTransitions.TryGetValue(Status, out var allowed) || !allowed.Contains(target))
+        {
+            failureMessage = target switch
+            {
+                Enums.TaskStatus.Pending =>
+                    $"Cannot set status to Pending from {Status}. Only InProgress tasks can be set back to Pending.",
+                Enums.TaskStatus.InProgress =>
+                    $"Cannot set status to InProgress from {Status}. Only Pending tasks can be set to InProgress.",
+                Enums.TaskStatus.Completed =>
+                    $"Cannot set status to Completed from {Status}.",
+                _ => $"Cannot transition from {Status} to {target}.",
+            };
+
+            return false;
+        }
+
+        failureMessage = string.Empty;
+        return true;
+    }
+
+    private void CommitTransitionTo(Enums.TaskStatus target)
+    {
+        if (Status == target)
+            return;
+
         Validate(Title, Description);
+        Status = target;
+        UpdatedAt = DateTime.UtcNow;
     }
 
     private static void Validate(string title, string description)
