@@ -1,4 +1,5 @@
 using MediatR;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 
@@ -7,7 +8,7 @@ namespace TaskFlow.Application.UseCases.User.GetCurrentUserProfile;
 /// <summary>
 /// Loads the user by id from the repository and maps to <see cref="UserDto"/>.
 /// </summary>
-public sealed class GetCurrentUserProfileQueryHandler : IRequestHandler<GetCurrentUserProfileQuery, UserDto?>
+public sealed class GetCurrentUserProfileQueryHandler : IRequestHandler<GetCurrentUserProfileQuery, Result<UserDto>>
 {
     private readonly IUserRepository _userRepository;
 
@@ -16,9 +17,18 @@ public sealed class GetCurrentUserProfileQueryHandler : IRequestHandler<GetCurre
         _userRepository = userRepository;
     }
 
-    public async Task<UserDto?> Handle(GetCurrentUserProfileQuery request, CancellationToken cancellationToken)
+    public async Task<Result<UserDto>> Handle(GetCurrentUserProfileQuery request, CancellationToken cancellationToken)
     {
         var user = await _userRepository.GetByIdAsync(request.UserId, cancellationToken);
-        return user is null ? null : UserDto.FromDomain(user);
+        if (user is null)
+        {
+            return Result<UserDto>.NotFound(
+                ErrorCodes.UserNotFound,
+                "User was not found.",
+                resource: "user",
+                id: request.UserId.ToString("D"));
+        }
+
+        return Result<UserDto>.Ok(UserDto.FromDomain(user));
     }
 }

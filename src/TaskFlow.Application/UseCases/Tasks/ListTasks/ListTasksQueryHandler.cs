@@ -1,5 +1,6 @@
 using MediatR;
 using TaskFlow.Application.Common;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 
@@ -8,7 +9,7 @@ namespace TaskFlow.Application.UseCases.Tasks.ListTasks;
 /// <summary>
 /// Handles paginated task listing for the authenticated user.
 /// </summary>
-public sealed class ListTasksQueryHandler : IRequestHandler<ListTasksQuery, PagedResult<TaskDto>>
+public sealed class ListTasksQueryHandler : IRequestHandler<ListTasksQuery, Result<PagedResult<TaskDto>>>
 {
     private readonly ITaskRepository _taskRepository;
 
@@ -17,7 +18,7 @@ public sealed class ListTasksQueryHandler : IRequestHandler<ListTasksQuery, Page
         _taskRepository = taskRepository;
     }
 
-    public async Task<PagedResult<TaskDto>> Handle(ListTasksQuery request, CancellationToken cancellationToken)
+    public async Task<Result<PagedResult<TaskDto>>> Handle(ListTasksQuery request, CancellationToken cancellationToken)
     {
         var paged = await _taskRepository.GetPagedAsync(
             request.UserId,
@@ -30,6 +31,6 @@ public sealed class ListTasksQueryHandler : IRequestHandler<ListTasksQuery, Page
             cancellationToken);
 
         var items = paged.Items.Select(TaskDto.FromDomain).ToList();
-        return new PagedResult<TaskDto>(items, paged.PageNumber, paged.PageSize, paged.TotalCount);
+        return Result<PagedResult<TaskDto>>.Ok(new PagedResult<TaskDto>(items, paged.PageNumber, paged.PageSize, paged.TotalCount));
     }
 }

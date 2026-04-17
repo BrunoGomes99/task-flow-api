@@ -1,4 +1,5 @@
 using MediatR;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Interfaces;
 
@@ -7,7 +8,7 @@ namespace TaskFlow.Application.UseCases.Tasks.GetTaskById;
 /// <summary>
 /// Handles retrieving a single task by id for the authenticated user.
 /// </summary>
-public sealed class GetTaskByIdQueryHandler : IRequestHandler<GetTaskByIdQuery, TaskDto?>
+public sealed class GetTaskByIdQueryHandler : IRequestHandler<GetTaskByIdQuery, Result<TaskDto>>
 {
     private readonly ITaskRepository _taskRepository;
 
@@ -16,9 +17,18 @@ public sealed class GetTaskByIdQueryHandler : IRequestHandler<GetTaskByIdQuery, 
         _taskRepository = taskRepository;
     }
 
-    public async Task<TaskDto?> Handle(GetTaskByIdQuery request, CancellationToken cancellationToken)
+    public async Task<Result<TaskDto>> Handle(GetTaskByIdQuery request, CancellationToken cancellationToken)
     {
         var task = await _taskRepository.GetByIdAsync(request.UserId, request.TaskId, cancellationToken);
-        return task is null ? null : TaskDto.FromDomain(task);
+        if (task is null)
+        {
+            return Result<TaskDto>.NotFound(
+                ErrorCodes.TaskNotFound,
+                "Task was not found.",
+                resource: "task",
+                id: request.TaskId.ToString("D"));
+        }
+
+        return Result<TaskDto>.Ok(TaskDto.FromDomain(task));
     }
 }

@@ -14,9 +14,9 @@ These rules apply in every phase. Verify them during implementation and code rev
 - [x] **Application references only Domain** — No Infrastructure or API references in Application.
 - [x] **Infrastructure references Application (and Domain via it)** — Implements interfaces defined in Application.
 - [x] **API references Application and Infrastructure** — For DI registration and startup only; no business logic in API layer.
-- [x] **Dependency Inversion** — All external concerns (repositories, auth, cache, messaging) are defined as interfaces in Application and implemented in Infrastructure. (`IUserRepository` and `ITaskRepository` now have MongoDB implementations; `IJwtService` and `IPasswordHasher` remain pending.)
-- [x] **Application cross-cutting errors** — Shared application exceptions where appropriate; e.g. `NotFoundException` in `Common/Exceptions` (resource name + optional id), used by Task handlers when a task is missing or not visible to the user.
-- [ ] **No business logic in controllers** — Controllers only map HTTP to use-case calls and return responses; validation and rules live in Application.
+- [x] **Dependency Inversion** — All external concerns (repositories, auth, cache, messaging) are defined as interfaces in Application and implemented in Infrastructure. (MongoDB repositories, `IJwtService`, and `IPasswordHasher` are implemented in `TaskFlow.Infrastructure`.)
+- [x] **Application expected outcomes without exceptions** — “Not found”, “conflict”, “unauthorized” flows are modeled via `Result`/`Result<T>` (`TaskFlow.Application.Common.Results`) and translated to HTTP by the API layer (`ProblemDetails` + stable `ErrorCode`).
+- [x] **No business logic in controllers** — Controllers only map HTTP to use-case calls and return responses; validation and rules live in Application.
 
 ### Naming and Structure
 
@@ -28,14 +28,47 @@ These rules apply in every phase. Verify them during implementation and code rev
 ### Validation and Security
 
 - [x] **Validation in Application layer** — FluentValidation validators for commands/queries; ValidationBehavior in MediatR pipeline runs validators before handlers.
-- [ ] **UserId from JWT only** — Never read UserId from body, query, or route for authorization; always from `sub` (or equivalent) claim.
-- [x] **Multi-tenancy in use cases (Task)** — Every Task command/query carries `UserId`; `ITaskRepository` is scoped by user (e.g. `GetByIdAsync(userId, taskId, …)`). **API layer (pending):** controllers must pass `UserId` from JWT `sub` only, not from the client body.
+- [x] **UserId from JWT only** — Never read UserId from body, query, or route for authorization; always from `sub` claim. API reads it via `ClaimsPrincipal.GetUserId()` which expects a valid GUID in `sub` (falls back to name identifier only when applicable).
+- [x] **Multi-tenancy in use cases (Task)** — Every Task command/query carries `UserId`; `ITaskRepository` is scoped by user (e.g. `GetByIdAsync(userId, taskId, …)`). **API layer:** controllers pass `UserId` from JWT `sub` only, not from the client body.
 
 ### API and HTTP
 
 - [x] **PageSize cap enforced** — `ListTasksQueryValidator` caps `PageSize` at **20**; API list endpoint must honor the same when exposed.
-- [ ] **Sensible HTTP status codes** — 200/201 for success, 400 for validation, 401 for unauthenticated, 403 for forbidden, 404 for not found, 500 for unexpected errors.
-- [ ] **Global exception middleware** — Unhandled exceptions are caught and returned as a consistent error response; no stack traces in non-development.
+- [x] **Sensible HTTP status codes** — 200/201 for success, 204 for successful updates/deletes, 400 for validation/argument errors, 401 for unauthenticated, 404 for not found, 409 for conflicts/business rules, 500 for unexpected errors.
+- [x] **Global exception handler** — Exceptions are mapped to `ProblemDetails`/`ValidationProblemDetails` via a single global handler (`IExceptionHandler` + `UseExceptionHandler()`); no stack traces in non-development.
+
+### Result-based Flow (No Exceptions for Expected Outcomes)
+
+Expected outcomes (not found, conflicts, invalid credentials) must NOT be represented as exceptions in Application handlers. Handlers must return explicit results and API translates them into HTTP responses.
+
+- **Handlers return `Result`/`Result<T>`** — defined in `TaskFlow.Application.Common`.
+  - **Queries**: `Result<T>`
+  - **Commands**: `Result` (no payload)
+- **Success carries semantics** — success is not a single boolean; it must express whether the API should return a payload or no content (the API translates semantics into HTTP).
+- **POST create** — controllers keep `CreatedAtAction(...)` for successful creation (Location header + discoverability). Non-success cases still use `FromResult(...)`.
+- **No 403 for multi-tenancy** — for resources owned by another user, return **404** (treat as not found) to avoid leaking existence.
+- **BadRequest in Application results** — use `Result.BadRequest(...)` / `Result<T>.BadRequest(...)` for expected client mistakes that are not covered by FluentValidation (maps to HTTP **400** with `ProblemDetails`).
+
+#### Error Contract (HTTP payload)
+
+All expected errors returned from `Result` must be translated into `ProblemDetails` with consistent extensions:
+
+- **`extensions.code`**: stable `ErrorCode` (e.g. `task.not_found`, `auth.invalid_credentials`)
+- **`extensions.resource`**: domain resource identifier (e.g. `task`, `user`, `auth`)
+- **`extensions.id`**: optional identifier when applicable (e.g. route `taskId`)
+- **`extensions.traceId`**: always included for telemetry correlation
+
+FluentValidation failures must translate to **400** using `ValidationProblemDetails` and must include:
+
+- **`extensions.code = request.validation_failed`**
+- **`extensions.traceId`** always
+
+### API Host Conventions (TaskFlow.Api)
+
+- [x] **JWT Bearer configuration** — `AddAuthentication().AddJwtBearer(...)` with `MapInboundClaims = false`, `ClockSkew = 0`, issuer/audience validation, and `NameClaimType = sub`.
+- [x] **Swagger security** — OpenAPI defines the `Bearer` scheme; use `POST /api/users/login` to obtain a token.
+- [x] **Enum serialization** — Enums are serialized as `camelCase` strings.
+- [x] **Uniform error responses** — `TaskFlowControllerBase` + `FromResult(...)` map `Result`/`Result<T>` failures to `ProblemDetails` with `code`, `resource`, optional `id`, and `traceId`.
 
 ### Quality and Tooling
 
@@ -60,9 +93,9 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Application Layer
 
-- [x] **User use cases** — RegisterUser, LoginUser (returns JWT + ExpiresIn), GetCurrentUserProfile under `UseCases/User/<UseCase>/` (command/query, validator, handler); API wiring pending.
+- [x] **User use cases** — RegisterUser, LoginUser (returns JWT + ExpiresIn), GetCurrentUserProfile under `UseCases/User/<UseCase>/` (command/query, validator, handler); API wiring implemented.
 - [x] **Task use cases** — Implemented with MediatR under `UseCases/Tasks/<UseCase>/`: CreateTask, GetTaskById, ListTasks (paginated, filtered, ordered by due date), UpdateTask, UpdateTaskStatus, DeleteTask; each with command/query, FluentValidation validator, and handler.
-- [x] **Interfaces** — IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, plus any other external dependency as interface. (MongoDB persistence is now implemented in Infrastructure; JWT + BCrypt remain pending.)
+- [x] **Interfaces** — IUserRepository, ITaskRepository, IJwtService, IPasswordHasher, plus any other external dependency as interface. (MongoDB persistence, JWT, and BCrypt are implemented in Infrastructure.)
 - [x] **Validation** — FluentValidation validators for commands/queries (e.g. CreateTaskCommandValidator); ValidationBehavior in MediatR pipeline; validators registered via AddApplicationValidation.
 - [x] **Pagination** — `ListTasksQuery` / `ListTasksQueryValidator` in `UseCases/Tasks/ListTasks/`: PageNumber, PageSize (max 20), optional filters (title, description, status), DueDate order (ASC/DESC).
 
@@ -71,16 +104,22 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 - [x] **MongoDB** — Separate collections for Users, Tasks; NotificationLog collection optional in Phase 1 (can be added in Phase 2).
 - [x] **Repositories** — UserRepository and TaskRepository implement Application interfaces; use official MongoDB driver or agreed abstraction.
 - [x] **Indexes** — Index on UserId for Tasks; compound index (UserId + DueDate) for Tasks; index on UserId (or Email for login) for Users as needed.
-- [ ] **JWT** — Service that generates and validates JWT with UserId in `sub`; no ASP.NET Identity.
-- [ ] **Password hashing** — BCrypt (or equivalent) used when registering and when validating login.
+- [x] **JWT** — `JwtService` issues JWT access tokens with UserId in `sub` and returns `ExpiresInSeconds`; no ASP.NET Identity.
+- [x] **Password hashing** — `BCryptPasswordHasher` used when registering and validating login; work factor is configuration-driven and validated.
 
 ### API Layer
 
-- [ ] **Controllers** — Thin controllers: map request to application DTO, call use case, map result to HTTP response.
-- [ ] **Auth** — JWT bearer authentication; all Task endpoints require `[Authorize]`; UserId read from claims and passed into use cases.
+- [x] **Controllers** — Thin controllers: map request to application DTO/command/query, call use case via `IMediator`, map result to HTTP response.
+- [x] **Auth** — JWT bearer authentication; all Task endpoints require `[Authorize]`; UserId read from claims (`sub`) and passed into use cases.
 - [x] **Health check** — `/health` (or equivalent) endpoint for Docker/orchestration; returns 200 when the app is ready.
-- [ ] **Exception middleware** — Catches exceptions, returns consistent error payload, appropriate status code, and logs.
-- [x] **DI registration** — Application services and MongoDB infrastructure registration are wired in `Program.cs`/startup; no business logic in composition root. (JWT + BCrypt services are still pending.)
+- [x] **Exception handler** — Catches exceptions, returns consistent `ProblemDetails` payloads, appropriate status codes, and no stack traces in non-development.
+- [x] **DI registration** — Application services and infrastructure registration are wired in `Program.cs`/startup; no business logic in composition root (MongoDB + indexes initializer, JWT, BCrypt, MediatR, Validation, Swagger, ExceptionHandler).
+
+---
+
+## Current Notes / Known Deviations (Keep Honest)
+
+- **OpenAPI return types**: several endpoints return `IActionResult` (instead of `ActionResult<T>`) to keep a single uniform error contract when application result payload types differ from API contract types.
 
 ### Testing (Phase 1)
 
