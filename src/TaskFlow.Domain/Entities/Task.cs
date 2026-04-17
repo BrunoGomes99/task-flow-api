@@ -74,7 +74,7 @@ public class Task : AggregateRoot
     public void Update(string title, string? description)
     {
         description ??= string.Empty;
-        Validate(Title, Description);
+        Validate(title, description);
 
         Title = title;
         Description = description;
