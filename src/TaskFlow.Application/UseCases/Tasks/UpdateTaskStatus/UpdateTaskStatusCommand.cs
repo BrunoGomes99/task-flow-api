@@ -1,4 +1,5 @@
 using MediatR;
+using TaskFlow.Application.Common.Results;
 
 namespace TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
 
@@ -8,4 +9,4 @@ namespace TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
 public sealed record UpdateTaskStatusCommand(
     Guid UserId,
     Guid TaskId,
-    TaskFlow.Domain.Enums.TaskStatus Status) : IRequest;
+    TaskFlow.Domain.Enums.TaskStatus Status) : IRequest<Result>;
