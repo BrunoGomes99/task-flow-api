@@ -158,7 +158,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 ## 10. Containerization
 
-- **Phase 1:** Dockerfile for the API and docker-compose with API and MongoDB; health checks for Docker.
+- **Phase 1 (done):** Multi-stage **Dockerfile** for the API; **docker-compose** with API + MongoDB; Mongo **healthcheck** and API **`depends_on: service_healthy`**; API **healthcheck** against `GET /health`; connection string via **environment / `.env`** (see `.env.example`); pinned service image tags; optional **mongo-express** for local DB inspection only.
 - **Later:** docker-compose can add RabbitMQ and Redis (Phase 2).
 
 ---
@@ -171,7 +171,7 @@ The system must be simple in domain complexity but architecturally mature.
 - User: register, login (JWT + `ExpiresIn`), get profile.
 - Task: full CRUD, paginated list (PageSize max 20), filters (title, description, status), ordering by DueDate.
 - Stack: .NET 10, MediatR (CQRS), FluentValidation, JWT (no Identity), BCrypt, MongoDB.
-- Docker: Dockerfile + docker-compose (API + MongoDB); health checks.
+- Docker: Dockerfile + docker-compose (API + MongoDB); health checks; configuration via env / `.env` for local stacks.
 - NotificationLog: **entity only** in Domain; no repository or endpoints.
 - Tests: xUnit for Domain and Application (mocks); progressive coverage.
 - Quality: SonarLint, global exception middleware, logging, multi-tenancy by UserId from JWT.
@@ -199,6 +199,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 ## 13. Document History
 
+- Phase 1 Docker stack and healthchecks aligned with repo (`docker-compose.yml`, `docker-compose.override.yml`, API `Dockerfile`); see Engineering Guidelines “Docker and Environment”.
 - Initial specification based on TaskFlow project plan and approved scope refinements (phases, PageSize 20, health checks, validation in Application layer).
 - Added MediatR, CQRS (Commands/Queries), and FluentValidation to architecture and Phase 1 stack.
 - Login response: documented `ExpiresIn` (seconds); refresh tokens explicitly deferred to a later version.
