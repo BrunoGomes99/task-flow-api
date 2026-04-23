@@ -1,4 +1,4 @@
-using TaskFlow.Application.Common.Exceptions;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.UseCases.User.GetCurrentUserProfile;
 using TaskFlow.Application.UseCases.User.LoginUser;
@@ -23,25 +23,28 @@ public sealed class UserUseCasesTests
             new RegisterUserCommand("Alice", "alice@example.com", "password12"),
             CancellationToken.None);
 
-        var persisted = await repository.GetByIdAsync(result.Id, CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        var persisted = await repository.GetByIdAsync(result.Value!.Id, CancellationToken.None);
         Assert.NotNull(persisted);
         Assert.Equal("alice@example.com", persisted!.Email.Value);
         Assert.Equal(PasswordHasher.Hash("password12"), persisted.PasswordHash);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task RegisterUserHandler_ShouldThrow_WhenEmailAlreadyExists()
+    public async System.Threading.Tasks.Task RegisterUserHandler_ShouldReturnConflict_WhenEmailAlreadyExists()
     {
         var repository = new InMemoryUserRepository();
         var existing = new DomainUser("Existing", "taken@example.com", PasswordHasher.Hash("password12"));
         await repository.AddAsync(existing, CancellationToken.None);
         var handler = new RegisterUserCommandHandler(repository, PasswordHasher);
 
-        var ex = await Assert.ThrowsAsync<ConflictException>(() => handler.Handle(
+        var result = await handler.Handle(
             new RegisterUserCommand("Other", "taken@example.com", "password12"),
-            CancellationToken.None));
+            CancellationToken.None);
 
-        Assert.Equal("This email is already registered.", ex.Message);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.UserEmailAlreadyInUse, result.Code);
+        Assert.Equal("This email is already registered.", result.Message);
     }
 
     [Fact]
@@ -57,32 +60,39 @@ public sealed class UserUseCasesTests
             new LoginUserCommand("bob@example.com", "secret12345"),
             CancellationToken.None);
 
-        Assert.Equal(JwtService.FormatToken(user.Id), result.AccessToken);
-        Assert.Equal(FakeJwtService.DefaultExpiresInSeconds, result.ExpiresIn);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(JwtService.FormatToken(user.Id), result.Value!.AccessToken);
+        Assert.Equal(FakeJwtService.DefaultExpiresInSeconds, result.Value.ExpiresIn);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task LoginUserHandler_ShouldThrowUnauthorized_WhenUserNotFound()
+    public async System.Threading.Tasks.Task LoginUserHandler_ShouldReturnUnauthorized_WhenUserNotFound()
     {
         var repository = new InMemoryUserRepository();
         var handler = new LoginUserCommandHandler(repository, PasswordHasher, JwtService);
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => handler.Handle(
+        var result = await handler.Handle(
             new LoginUserCommand("nobody@example.com", "password12"),
-            CancellationToken.None));
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.AuthInvalidCredentials, result.Code);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task LoginUserHandler_ShouldThrowUnauthorized_WhenPasswordInvalid()
+    public async System.Threading.Tasks.Task LoginUserHandler_ShouldReturnUnauthorized_WhenPasswordInvalid()
     {
         var repository = new InMemoryUserRepository();
         var user = new DomainUser("Bob", "bob@example.com", PasswordHasher.Hash("correctpass1"));
         await repository.AddAsync(user, CancellationToken.None);
         var handler = new LoginUserCommandHandler(repository, PasswordHasher, JwtService);
 
-        await Assert.ThrowsAsync<UnauthorizedAccessException>(() => handler.Handle(
+        var result = await handler.Handle(
             new LoginUserCommand("bob@example.com", "wrongpassword"),
-            CancellationToken.None));
+            CancellationToken.None);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.AuthInvalidCredentials, result.Code);
     }
 
     [Fact]
@@ -93,23 +103,24 @@ public sealed class UserUseCasesTests
         await repository.AddAsync(user, CancellationToken.None);
         var handler = new GetCurrentUserProfileQueryHandler(repository);
 
-        var dto = await handler.Handle(new GetCurrentUserProfileQuery(user.Id), CancellationToken.None);
+        var result = await handler.Handle(new GetCurrentUserProfileQuery(user.Id), CancellationToken.None);
 
-        Assert.NotNull(dto);
-        Assert.Equal(user.Id, dto!.Id);
-        Assert.Equal("Carol", dto.Name);
-        Assert.Equal("carol@example.com", dto.Email);
+        Assert.True(result.IsSuccess);
+        Assert.Equal(user.Id, result.Value!.Id);
+        Assert.Equal("Carol", result.Value.Name);
+        Assert.Equal("carol@example.com", result.Value.Email);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetCurrentUserProfileHandler_ShouldReturnNull_WhenUserNotFound()
+    public async System.Threading.Tasks.Task GetCurrentUserProfileHandler_ShouldReturnNotFound_WhenUserNotFound()
     {
         var repository = new InMemoryUserRepository();
         var handler = new GetCurrentUserProfileQueryHandler(repository);
 
-        var dto = await handler.Handle(new GetCurrentUserProfileQuery(Guid.NewGuid()), CancellationToken.None);
+        var result = await handler.Handle(new GetCurrentUserProfileQuery(Guid.NewGuid()), CancellationToken.None);
 
-        Assert.Null(dto);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.UserNotFound, result.Code);
     }
 
     private sealed class InMemoryUserRepository : IUserRepository
