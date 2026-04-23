@@ -66,7 +66,7 @@ FluentValidation failures must translate to **400** using `ValidationProblemDeta
 ### API Host Conventions (TaskFlow.Api)
 
 - [x] **JWT Bearer configuration** — `AddAuthentication().AddJwtBearer(...)` with `MapInboundClaims = false`, `ClockSkew = 0`, issuer/audience validation, and `NameClaimType = sub`.
-- [x] **Swagger security** — OpenAPI defines the `Bearer` scheme; use `POST /api/users/login` to obtain a token.
+- [x] **Swagger security** — OpenAPI defines the `Bearer` scheme; `BearerSecurityDocumentFilter` ensures `security` is emitted so Swagger UI sends `Authorization` (paste the raw JWT from `POST /api/users/login`, without a `Bearer ` prefix).
 - [x] **Enum serialization** — Enums are serialized as `camelCase` strings.
 - [x] **Uniform error responses** — `TaskFlowControllerBase` + `FromResult(...)` map `Result`/`Result<T>` failures to `ProblemDetails` with `code`, `resource`, optional `id`, and `traceId`.
 
@@ -113,13 +113,14 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 - [x] **Auth** — JWT bearer authentication; all Task endpoints require `[Authorize]`; UserId read from claims (`sub`) and passed into use cases.
 - [x] **Health check** — `/health` (or equivalent) endpoint for Docker/orchestration; returns 200 when the app is ready.
 - [x] **Exception handler** — Catches exceptions, returns consistent `ProblemDetails` payloads, appropriate status codes, and no stack traces in non-development.
-- [x] **DI registration** — Application services and infrastructure registration are wired in `Program.cs`/startup; no business logic in composition root (MongoDB + indexes initializer, JWT, BCrypt, MediatR, Validation, Swagger, ExceptionHandler).
+- [x] **DI registration** — Application services and infrastructure registration are wired in `Program.cs`/startup; no business logic in composition root (MongoDB + indexes initializer, JWT, BCrypt, MediatR, Validation, Swagger, `AddProblemDetails()` + `IExceptionHandler`, `UseExceptionHandler()`).
 
 ---
 
 ## Current Notes / Known Deviations (Keep Honest)
 
-- **OpenAPI return types**: several endpoints return `IActionResult` (instead of `ActionResult<T>`) to keep a single uniform error contract when application result payload types differ from API contract types.
+- **Use-case vs controller responsibility for 404**: Some controllers currently return `NotFound()` when a use case returns `null` (e.g. `GetTaskById`, `GetCurrentUserProfile`). Prefer a single approach: either (a) Application throws `NotFoundException` and API relies on global mapping, or (b) Application returns `null` and controllers handle it. Avoid mixing styles within the same bounded context.
+- **Docker / HTTPS**: `docker-compose.override.yml` runs the API container on **HTTP only** (no HTTPS listener inside the container). Production-style TLS is expected to terminate at a reverse proxy or Ingress (see project discussions). `UseHttpsRedirection()` is skipped in **Development** so local container runs do not require a dev certificate inside the image.
 
 ### Testing (Phase 1)
 
@@ -130,9 +131,9 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Docker and Environment (Phase 1)
 
-- [ ] **Dockerfile** — Builds and runs the API project; multi-stage build if desired.
-- [ ] **docker-compose** — Includes API and MongoDB; API depends on MongoDB; health check or wait strategy so API starts after MongoDB is ready.
-- [ ] **Configuration** — Connection strings and JWT settings via configuration (environment variables or appsettings); no secrets in source.
+- [x] **Dockerfile** — Multi-stage build for the API; final image runs as non-root; `curl` installed for compose healthchecks; comments in English.
+- [x] **docker-compose** — API + MongoDB; `depends_on` with `service_healthy` on Mongo; API healthcheck hits `GET /health`; pinned image tags; optional **mongo-express** for local DB UI (not required by spec).
+- [x] **Configuration** — `MongoDb__ConnectionString` (and Mongo credentials) supplied via compose / `.env` (see `.env.example`); JWT remains in configuration (`appsettings` / User Secrets on host). **`.env` is gitignored** — do not commit real secrets.
 
 ---
 
@@ -180,7 +181,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 ### Documentation and Hygiene
 
 - [ ] **README** — How to build, run tests, run with Docker; link to PROJECT_SPEC.md and this file.
-- [ ] **.gitignore** — Covers build outputs, user-specific files, and secrets; no committed secrets or credentials.
+- [x] **.gitignore** — Covers build outputs, user-specific files, and secrets (including local `.env`); no committed secrets or credentials.
 
 ---
 
