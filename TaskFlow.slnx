@@ -10,4 +10,7 @@
     <Project Path="tests/TaskFlow.Domain.Tests/TaskFlow.Domain.Tests.csproj" />
     <Project Path="tests/TaskFlow.Infrastructure.Tests/TaskFlow.Infrastructure.Tests.csproj" />
   </Folder>
+  <Project Path="docker-compose.dcproj">
+    <Build />
+  </Project>
 </Solution>
