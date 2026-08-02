@@ -1,4 +1,5 @@
 using MediatR;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.Interfaces;
 using DomainTask = TaskFlow.Domain.Entities.Task;
 
@@ -7,7 +8,7 @@ namespace TaskFlow.Application.UseCases.Tasks.CreateTask;
 /// <summary>
 /// Handles task creation.
 /// </summary>
-public sealed class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, CreateTaskResult>
+public sealed class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand, Result<CreateTaskResult>>
 {
     private readonly ITaskRepository _taskRepository;
 
@@ -16,7 +17,7 @@ public sealed class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand
         _taskRepository = taskRepository;
     }
 
-    public async Task<CreateTaskResult> Handle(CreateTaskCommand request, CancellationToken cancellationToken)
+    public async Task<Result<CreateTaskResult>> Handle(CreateTaskCommand request, CancellationToken cancellationToken)
     {
         var task = new DomainTask(
             request.UserId,
@@ -26,6 +27,6 @@ public sealed class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand
             request.DueDate);
 
         await _taskRepository.AddAsync(task, cancellationToken);
-        return new CreateTaskResult(task.Id);
+        return Result<CreateTaskResult>.Ok(new CreateTaskResult(task.Id));
     }
 }

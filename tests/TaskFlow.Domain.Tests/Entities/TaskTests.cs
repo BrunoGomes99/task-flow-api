@@ -1,7 +1,5 @@
 using DomainTask = TaskFlow.Domain.Entities.Task;
 using DomainTaskStatus = TaskFlow.Domain.Enums.TaskStatus;
-using TaskFlow.Domain.Exceptions;
-
 namespace TaskFlow.Domain.Tests.Entities;
 
 public sealed class TaskTests
@@ -71,72 +69,77 @@ public sealed class TaskTests
     }
 
     [Fact]
-    public void SetInProgress_ShouldTransition_WhenPending()
+    public void TryChangeStatusTo_ShouldTransitionToInProgress_WhenPending()
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        task.SetInProgress();
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.InProgress, out _));
 
         Assert.Equal(DomainTaskStatus.InProgress, task.Status);
         Assert.Equal(DateTimeKind.Utc, task.UpdatedAt.Kind);
     }
 
     [Fact]
-    public void SetInProgress_ShouldThrow_WhenNotPending()
+    public void TryChangeStatusTo_ShouldBeIdempotent_WhenAlreadyInProgress()
     {
         var task = new DomainTask(UserId, "ABC", null, DomainTaskStatus.InProgress, null);
 
-        Assert.Throws<TaskStatusTransitionException>(() => task.SetInProgress());
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.InProgress, out _));
+
+        Assert.Equal(DomainTaskStatus.InProgress, task.Status);
     }
 
     [Fact]
-    public void SetPending_ShouldTransition_WhenInProgress()
+    public void TryChangeStatusTo_ShouldTransitionToPending_WhenInProgress()
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        task.SetInProgress();
-        task.SetPending();
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.InProgress, out _));
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.Pending, out _));
 
         Assert.Equal(DomainTaskStatus.Pending, task.Status);
     }
 
     [Fact]
-    public void SetPending_ShouldThrow_WhenNotInProgress()
+    public void TryChangeStatusTo_ShouldBeIdempotent_WhenAlreadyPending()
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        Assert.Throws<TaskStatusTransitionException>(() => task.SetPending());
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.Pending, out _));
+
+        Assert.Equal(DomainTaskStatus.Pending, task.Status);
     }
 
     [Fact]
-    public void SetCompleted_ShouldTransition_WhenPending()
+    public void TryChangeStatusTo_ShouldTransitionToCompleted_WhenPending()
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        task.SetCompleted();
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.Completed, out _));
 
         Assert.Equal(DomainTaskStatus.Completed, task.Status);
     }
 
     [Fact]
-    public void SetCompleted_ShouldTransition_WhenInProgress()
+    public void TryChangeStatusTo_ShouldTransitionToCompleted_WhenInProgress()
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        task.SetInProgress();
-        task.SetCompleted();
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.InProgress, out _));
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.Completed, out _));
 
         Assert.Equal(DomainTaskStatus.Completed, task.Status);
     }
 
     [Fact]
-    public void SetCompleted_ShouldThrow_WhenAlreadyCompleted()
+    public void TryChangeStatusTo_ShouldFail_WhenAlreadyCompleted()
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        task.SetCompleted();
+        Assert.True(task.TryChangeStatusTo(DomainTaskStatus.Completed, out _));
 
-        Assert.Throws<TaskStatusTransitionException>(() => task.SetCompleted());
+        Assert.False(task.TryChangeStatusTo(DomainTaskStatus.Completed, out var failure));
+        Assert.Contains("already completed", failure, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

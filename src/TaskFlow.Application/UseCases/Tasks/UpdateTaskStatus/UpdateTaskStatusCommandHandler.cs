@@ -1,16 +1,14 @@
 using MediatR;
-using TaskFlow.Application.Common.Exceptions;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.Interfaces;
-using TaskFlow.Domain.Exceptions;
-using DomainTaskStatus = TaskFlow.Domain.Enums.TaskStatus;
 
 namespace TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
 
 /// <summary>
 /// Handles task status transitions using domain methods.
-/// Invalid transitions throw <see cref="TaskStatusTransitionException"/> and are mapped to HTTP 409 in the API.
+/// Invalid transitions are represented as <see cref="Result"/> conflicts (HTTP 409 at the API boundary).
 /// </summary>
-public sealed class UpdateTaskStatusCommandHandler : IRequestHandler<UpdateTaskStatusCommand>
+public sealed class UpdateTaskStatusCommandHandler : IRequestHandler<UpdateTaskStatusCommand, Result>
 {
     private readonly ITaskRepository _taskRepository;
 
@@ -19,27 +17,28 @@ public sealed class UpdateTaskStatusCommandHandler : IRequestHandler<UpdateTaskS
         _taskRepository = taskRepository;
     }
 
-    public async Task Handle(UpdateTaskStatusCommand request, CancellationToken cancellationToken)
+    public async Task<Result> Handle(UpdateTaskStatusCommand request, CancellationToken cancellationToken)
     {
         var task = await _taskRepository.GetByIdAsync(request.UserId, request.TaskId, cancellationToken);
         if (task is null)
-            throw new NotFoundException("Task", request.TaskId);
-
-        switch (request.Status)
         {
-            case DomainTaskStatus.Pending:
-                task.SetPending();
-                break;
-            case DomainTaskStatus.InProgress:
-                task.SetInProgress();
-                break;
-            case DomainTaskStatus.Completed:
-                task.SetCompleted();
-                break;
-            default:
-                throw new ArgumentOutOfRangeException(nameof(request.Status), request.Status, "Unsupported task status.");
+            return Result.NotFound(
+                ErrorCodes.TaskNotFound,
+                "Task was not found.",
+                resource: "task",
+                id: request.TaskId.ToString("D"));
+        }
+
+        if (!task.TryChangeStatusTo(request.Status, out var transitionFailure))
+        {
+            return Result.Conflict(
+                ErrorCodes.TaskStatusTransitionInvalid,
+                transitionFailure,
+                resource: "task",
+                id: request.TaskId.ToString("D"));
         }
 
         await _taskRepository.UpdateAsync(task, cancellationToken);
+        return Result.Success();
     }
 }

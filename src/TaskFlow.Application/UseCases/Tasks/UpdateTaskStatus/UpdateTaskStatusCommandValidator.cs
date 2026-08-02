@@ -3,7 +3,7 @@ using FluentValidation;
 namespace TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
 
 /// <summary>
-/// Validates UpdateTaskStatusCommand. TaskId must not be empty.
+/// Validates <see cref="UpdateTaskStatusCommand"/> before the handler runs.
 /// </summary>
 public sealed class UpdateTaskStatusCommandValidator : AbstractValidator<UpdateTaskStatusCommand>
 {
@@ -14,5 +14,9 @@ public sealed class UpdateTaskStatusCommandValidator : AbstractValidator<UpdateT
 
         RuleFor(x => x.TaskId)
             .NotEmpty().WithMessage("TaskId is required.");
+
+        RuleFor(x => x.Status)
+            .Must(s => Enum.IsDefined(s))
+            .WithMessage("Unsupported task status.");
     }
 }

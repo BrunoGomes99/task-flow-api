@@ -1,9 +1,8 @@
 using FluentValidation;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using TaskFlow.Application.Common.Exceptions;
-using TaskFlow.Domain.Exceptions;
-
+using TaskFlow.Api.Http;
+using TaskFlow.Application.Common.Results;
 namespace TaskFlow.Api.Middleware;
 
 public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExceptionHandler
@@ -16,7 +15,7 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
         ArgumentNullException.ThrowIfNull(httpContext);
         ArgumentNullException.ThrowIfNull(exception);
 
-        var (statusCode, problem) = MapException(exception, environment);
+        var (statusCode, problem) = MapException(exception, environment, httpContext);
 
         httpContext.Response.StatusCode = statusCode;
         await httpContext.Response.WriteAsJsonAsync(problem, cancellationToken).ConfigureAwait(false);
@@ -24,7 +23,10 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
         return true;
     }
 
-    private static (int StatusCode, object Problem) MapException(Exception exception, IHostEnvironment environment)
+    private static (int StatusCode, object Problem) MapException(
+        Exception exception,
+        IHostEnvironment environment,
+        HttpContext httpContext)
     {
         switch (exception)
         {
@@ -39,64 +41,61 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
                     Title = "One or more validation errors occurred.",
                     Status = StatusCodes.Status400BadRequest,
                 };
+
+                validationProblem.ApplyTraceId(httpContext);
+                validationProblem.ApplyErrorCode(ErrorCodes.RequestValidationFailed);
                 return (StatusCodes.Status400BadRequest, validationProblem);
             }
 
-            case NotFoundException nf:
-                return (StatusCodes.Status404NotFound, new ProblemDetails
-                {
-                    Title = "Not found",
-                    Detail = nf.Message,
-                    Status = StatusCodes.Status404NotFound,
-                });
-
-            case ConflictException cx:
-                return (StatusCodes.Status409Conflict, new ProblemDetails
-                {
-                    Title = "Conflict",
-                    Detail = cx.Message,
-                    Status = StatusCodes.Status409Conflict,
-                });
-
-            case BusinessRuleViolationException br:
-                return (StatusCodes.Status409Conflict, new ProblemDetails
-                {
-                    Title = "Conflict",
-                    Detail = br.Message,
-                    Status = StatusCodes.Status409Conflict,
-                });
-
-            case TaskStatusTransitionException tst:
-                return (StatusCodes.Status409Conflict, new ProblemDetails
-                {
-                    Title = "Conflict",
-                    Detail = tst.Message,
-                    Status = StatusCodes.Status409Conflict,
-                });
-
             case UnauthorizedAccessException ua:
-                return (StatusCodes.Status401Unauthorized, new ProblemDetails
+            {
+                var problem = new ProblemDetails
                 {
                     Title = "Unauthorized",
                     Detail = ua.Message,
                     Status = StatusCodes.Status401Unauthorized,
-                });
+                };
+
+                problem.ApplyTraceId(httpContext);
+                problem.ApplyErrorCode(MapUnauthorizedCode(ua));
+                problem.ApplyResourceMetadata("auth", id: null);
+                return (StatusCodes.Status401Unauthorized, problem);
+            }
 
             case ArgumentException ae:
-                return (StatusCodes.Status400BadRequest, new ProblemDetails
+            {
+                var problem = new ProblemDetails
                 {
                     Title = "Bad request",
                     Detail = ae.Message,
                     Status = StatusCodes.Status400BadRequest,
-                });
+                };
+
+                problem.ApplyTraceId(httpContext);
+                problem.ApplyErrorCode(ErrorCodes.RequestInvalidArgument);
+                return (StatusCodes.Status400BadRequest, problem);
+            }
 
             default:
-                return (StatusCodes.Status500InternalServerError, new ProblemDetails
+            {
+                var problem = new ProblemDetails
                 {
                     Title = "Server error",
                     Detail = environment.IsDevelopment() ? exception.ToString() : "An unexpected error occurred.",
                     Status = StatusCodes.Status500InternalServerError,
-                });
+                };
+
+                problem.ApplyTraceId(httpContext);
+                problem.ApplyErrorCode(ErrorCodes.ServerUnexpectedError);
+                return (StatusCodes.Status500InternalServerError, problem);
+            }
         }
+    }
+
+    private static string MapUnauthorizedCode(UnauthorizedAccessException ua)
+    {
+        return ua.Message.Contains("sub", StringComparison.OrdinalIgnoreCase)
+            ? ErrorCodes.AuthMissingOrInvalidSub
+            : ErrorCodes.AuthInvalidCredentials;
     }
 }

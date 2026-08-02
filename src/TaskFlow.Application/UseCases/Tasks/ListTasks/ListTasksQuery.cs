@@ -1,5 +1,6 @@
 using MediatR;
 using TaskFlow.Application.Common;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Enums;
 
@@ -16,4 +17,4 @@ public sealed record ListTasksQuery(
     string? TitleContains,
     string? DescriptionContains,
     TaskFlow.Domain.Enums.TaskStatus? Status,
-    DueDateOrder DueDateOrder) : IRequest<PagedResult<TaskDto>>;
+    DueDateOrder DueDateOrder) : IRequest<Result<PagedResult<TaskDto>>>;

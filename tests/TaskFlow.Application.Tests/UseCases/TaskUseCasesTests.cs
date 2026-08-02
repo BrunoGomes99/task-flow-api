@@ -1,4 +1,5 @@
 using TaskFlow.Application.Common;
+using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.UseCases.Tasks.CreateTask;
 using TaskFlow.Application.UseCases.Tasks.DeleteTask;
 using TaskFlow.Application.UseCases.Tasks.GetTaskById;
@@ -25,13 +26,14 @@ public sealed class TaskUseCasesTests
             new CreateTaskCommand(userId, "Task title", "Task description", DomainTaskStatus.Pending, null),
             CancellationToken.None);
 
-        var persisted = await repository.GetByIdAsync(userId, result.Id, CancellationToken.None);
+        Assert.True(result.IsSuccess);
+        var persisted = await repository.GetByIdAsync(userId, result.Value!.Id, CancellationToken.None);
         Assert.NotNull(persisted);
         Assert.Equal("Task title", persisted!.Title);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task GetTaskByIdHandler_ShouldReturnNull_WhenTaskDoesNotExist()
+    public async System.Threading.Tasks.Task GetTaskByIdHandler_ShouldReturnNotFound_WhenTaskDoesNotExist()
     {
         var repository = new InMemoryTaskRepository();
         var handler = new GetTaskByIdQueryHandler(repository);
@@ -40,7 +42,8 @@ public sealed class TaskUseCasesTests
             new GetTaskByIdQuery(Guid.NewGuid(), Guid.NewGuid()),
             CancellationToken.None);
 
-        Assert.Null(result);
+        Assert.False(result.IsSuccess);
+        Assert.Equal(ErrorCodes.TaskNotFound, result.Code);
     }
 
     [Fact]
@@ -56,9 +59,10 @@ public sealed class TaskUseCasesTests
             new ListTasksQuery(userId, 1, 20, null, null, null, DueDateOrder.Ascending),
             CancellationToken.None);
 
-        Assert.Equal(2, result.TotalCount);
-        Assert.Equal(2, result.Items.Count);
-        Assert.Contains(result.Items, x => x.Title == "Alpha");
+        Assert.True(result.IsSuccess);
+        Assert.Equal(2, result.Value!.TotalCount);
+        Assert.Equal(2, result.Value.Items.Count);
+        Assert.Contains(result.Value.Items, x => x.Title == "Alpha");
     }
 
     [Fact]
@@ -70,9 +74,11 @@ public sealed class TaskUseCasesTests
         await repository.AddAsync(task, CancellationToken.None);
         var handler = new UpdateTaskCommandHandler(repository);
 
-        await handler.Handle(
+        var updateResult = await handler.Handle(
             new UpdateTaskCommand(userId, task.Id, "New", "New desc"),
             CancellationToken.None);
+
+        Assert.True(updateResult.IsSuccess);
 
         var updated = await repository.GetByIdAsync(userId, task.Id, CancellationToken.None);
         Assert.NotNull(updated);
@@ -89,9 +95,11 @@ public sealed class TaskUseCasesTests
         await repository.AddAsync(task, CancellationToken.None);
         var handler = new UpdateTaskStatusCommandHandler(repository);
 
-        await handler.Handle(
+        var statusResult = await handler.Handle(
             new UpdateTaskStatusCommand(userId, task.Id, DomainTaskStatus.InProgress),
             CancellationToken.None);
+
+        Assert.True(statusResult.IsSuccess);
 
         var updated = await repository.GetByIdAsync(userId, task.Id, CancellationToken.None);
         Assert.NotNull(updated);
@@ -99,7 +107,7 @@ public sealed class TaskUseCasesTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task DeleteTaskHandler_ShouldReturnTrue_WhenTaskExists()
+    public async System.Threading.Tasks.Task DeleteTaskHandler_ShouldDelete_WhenTaskExists()
     {
         var repository = new InMemoryTaskRepository();
         var userId = Guid.NewGuid();
@@ -107,9 +115,9 @@ public sealed class TaskUseCasesTests
         await repository.AddAsync(task, CancellationToken.None);
         var handler = new DeleteTaskCommandHandler(repository);
 
-        var deleted = await handler.Handle(new DeleteTaskCommand(userId, task.Id), CancellationToken.None);
+        var deleteResult = await handler.Handle(new DeleteTaskCommand(userId, task.Id), CancellationToken.None);
 
-        Assert.True(deleted);
+        Assert.True(deleteResult.IsSuccess);
         var existing = await repository.GetByIdAsync(userId, task.Id, CancellationToken.None);
         Assert.Null(existing);
     }

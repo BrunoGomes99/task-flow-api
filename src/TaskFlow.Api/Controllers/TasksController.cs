@@ -18,13 +18,13 @@ namespace TaskFlow.Api.Controllers;
 [Authorize]
 [Route("api/tasks")]
 [Produces("application/json")]
-public sealed class TasksController(IMediator mediator) : ControllerBase
+public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
 {
     [HttpGet]
     [ProducesResponseType(typeof(PagedResult<TaskDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<PagedResult<TaskDto>>> List(
+    public async Task<IActionResult> List(
         [FromQuery] ListTasksQueryParameters query,
         CancellationToken cancellationToken)
     {
@@ -40,29 +40,26 @@ public sealed class TasksController(IMediator mediator) : ControllerBase
                 query.DueDateOrder),
             cancellationToken);
 
-        return Ok(result);
+        return FromResult(result);
     }
 
     [HttpGet("{taskId:guid}")]
     [ProducesResponseType(typeof(TaskDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<TaskDto>> GetById(Guid taskId, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetById(Guid taskId, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var task = await mediator.Send(new GetTaskByIdQuery(userId, taskId), cancellationToken);
+        var result = await mediator.Send(new GetTaskByIdQuery(userId, taskId), cancellationToken);
 
-        if (task is null)
-            return NotFound();
-
-        return Ok(task);
+        return FromResult(result);
     }
 
     [HttpPost]
     [ProducesResponseType(typeof(CreateTaskResult), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<CreateTaskResult>> Create(
+    public async Task<IActionResult> Create(
         [FromBody] CreateTaskRequest request,
         CancellationToken cancellationToken)
     {
@@ -71,7 +68,10 @@ public sealed class TasksController(IMediator mediator) : ControllerBase
             new CreateTaskCommand(userId, request.Title, request.Description, request.Status, request.DueDate),
             cancellationToken);
 
-        return CreatedAtAction(nameof(GetById), new { taskId = result.Id }, result);
+        if (!result.IsSuccess)
+            return FromResult(result);
+
+        return CreatedAtAction(nameof(GetById), new { taskId = result.Value!.Id }, result.Value);
     }
 
     [HttpPut("{taskId:guid}")]
@@ -85,11 +85,11 @@ public sealed class TasksController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        await mediator.Send(
+        var result = await mediator.Send(
             new UpdateTaskCommand(userId, taskId, request.Title, request.Description),
             cancellationToken);
 
-        return NoContent();
+        return FromResult(result);
     }
 
     [HttpPatch("{taskId:guid}/status")]
@@ -103,9 +103,9 @@ public sealed class TasksController(IMediator mediator) : ControllerBase
         CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        await mediator.Send(new UpdateTaskStatusCommand(userId, taskId, request.Status), cancellationToken);
+        var result = await mediator.Send(new UpdateTaskStatusCommand(userId, taskId, request.Status), cancellationToken);
 
-        return NoContent();
+        return FromResult(result);
     }
 
     [HttpDelete("{taskId:guid}")]
@@ -115,11 +115,8 @@ public sealed class TasksController(IMediator mediator) : ControllerBase
     public async Task<IActionResult> Delete(Guid taskId, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var deleted = await mediator.Send(new DeleteTaskCommand(userId, taskId), cancellationToken);
+        var result = await mediator.Send(new DeleteTaskCommand(userId, taskId), cancellationToken);
 
-        if (!deleted)
-            return NotFound();
-
-        return NoContent();
+        return FromResult(result);
     }
 }

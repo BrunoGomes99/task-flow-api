@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using TaskFlow.Api.Contracts;
 using TaskFlow.Api.Extensions;
+using TaskFlow.Api.Http;
 using TaskFlow.Application.DTOs;
 using TaskFlow.Application.UseCases.User.GetCurrentUserProfile;
 using TaskFlow.Application.UseCases.User.LoginUser;
@@ -13,14 +14,14 @@ namespace TaskFlow.Api.Controllers;
 [ApiController]
 [Route("api/users")]
 [Produces("application/json")]
-public sealed class UsersController(IMediator mediator) : ControllerBase
+public sealed class UsersController(IMediator mediator) : TaskFlowControllerBase
 {
     [HttpPost("register")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(RegisterUserResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
-    public async Task<ActionResult<RegisterUserResponse>> Register(
+    public async Task<IActionResult> Register(
         [FromBody] RegisterUserRequest request,
         CancellationToken cancellationToken)
     {
@@ -28,7 +29,10 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
             new RegisterUserCommand(request.Name, request.Email, request.Password),
             cancellationToken);
 
-        return CreatedAtAction(nameof(GetProfile), routeValues: null, value: new RegisterUserResponse(result.Id));
+        if (!result.IsSuccess)
+            return result.ToHttpActionResult<RegisterUserResult>(HttpContext);
+
+        return CreatedAtAction(nameof(GetProfile), routeValues: null, value: new RegisterUserResponse(result.Value!.Id));
     }
 
     [HttpPost("login")]
@@ -36,15 +40,15 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
-    public async Task<ActionResult<LoginResponse>> Login(
+    public async Task<IActionResult> Login(
         [FromBody] LoginUserRequest request,
         CancellationToken cancellationToken)
     {
-        var response = await mediator.Send(
+        var result = await mediator.Send(
             new LoginUserCommand(request.Email, request.Password),
             cancellationToken);
 
-        return Ok(response);
+        return FromResult(result);
     }
 
     [HttpGet("me")]
@@ -52,14 +56,11 @@ public sealed class UsersController(IMediator mediator) : ControllerBase
     [ProducesResponseType(typeof(UserDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
-    public async Task<ActionResult<UserDto>> GetProfile(CancellationToken cancellationToken)
+    public async Task<IActionResult> GetProfile(CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
-        var profile = await mediator.Send(new GetCurrentUserProfileQuery(userId), cancellationToken);
+        var result = await mediator.Send(new GetCurrentUserProfileQuery(userId), cancellationToken);
 
-        if (profile is null)
-            return NotFound();
-
-        return Ok(profile);
+        return FromResult(result);
     }
 }
