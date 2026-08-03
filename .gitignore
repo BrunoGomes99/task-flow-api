@@ -39,6 +39,12 @@ ScaffoldingReadMe.txt
 # Local Docker / secrets
 .env
 
+# Terraform
+terraform.tfvars
+.terraform/
+crash.log
+crash.*.log
+
 # Others
 ~$*
 *~
