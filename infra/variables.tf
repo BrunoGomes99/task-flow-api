@@ -27,9 +27,3 @@ variable "allowed_ssh_cidr" {
   type        = string
   default     = ""
 }
-
-variable "az" {
-  description = "Availability Zone for the public subnet."
-  type        = string
-  default     = "us-east-1a"
-}
