@@ -143,7 +143,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### GitHub Actions
 
-- [ ] **CI workflow** — On push/PR: restore, build, run tests; fail if build or tests fail.
+- [x] **CI workflow** — On push/PR: restore, build, run tests; fail if build or tests fail.
 - [ ] **No secrets in workflows** — Use GitHub secrets or environment for any credentials; no hardcoded secrets.
 - [ ] **CD / Publish (optional)** — Workflow or separate workflow to build Docker image and push to Amazon ECR; trigger on `workflow_dispatch` and/or tag as agreed.
 - [ ] **Docker image** — Image is built from the same Dockerfile used locally; tagged with commit SHA or version.

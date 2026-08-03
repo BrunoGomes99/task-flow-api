@@ -130,7 +130,7 @@ dotnet test TaskFlow.slnx --no-build -c Release
 
 Expected: all projects build; all tests pass (same as CI).
 
-- [ ] **Step 3: Mark Engineering Guidelines CI checkbox when workflow is merged/green**
+- [x] **Step 3: Mark Engineering Guidelines CI checkbox when workflow is merged/green**
 
 In `docs/ENGINEERING_GUIDELINES.md` Phase 2 → GitHub Actions, check **CI workflow** after the first green run on GitHub.
 
