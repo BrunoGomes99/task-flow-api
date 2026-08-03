@@ -7,7 +7,8 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 - **User** — Register, login (JWT), get profile
 - **Tasks** — Full CRUD, paginated list (filters: title, description, status; sort by due date)
 - **Auth** — JWT (no ASP.NET Identity), BCrypt password hashing, multi-tenancy via `UserId` from token
-- **Planned** — Redis cache (Cache Aside), RabbitMQ events, GitHub Actions CI/CD
+- **Planned (Phase 2)** — GitHub Actions CI, ECR publish, Terraform AWS study stack (EC2 + Docker Compose)
+- **Planned (Phase 3)** — Redis cache (Cache Aside), RabbitMQ events, NotificationLog persistence
 
 ## Tech Stack
 
@@ -81,7 +82,7 @@ src/
     Interfaces/              # ITaskRepository, IUserRepository, etc.
     Behaviors/               # ValidationBehavior (FluentValidation pipeline)
     Extensions/              # AddApplicationValidation, DI registration
-  TaskFlow.Infrastructure/   # MongoDB, JWT, (Redis, RabbitMQ in Phase 2)
+  TaskFlow.Infrastructure/   # MongoDB, JWT, (Redis, RabbitMQ in Phase 3)
   TaskFlow.Api/              # Controllers, middleware, configuration
 tests/
   TaskFlow.Domain.Tests/
@@ -97,3 +98,6 @@ tests/
 
 - [Project Specification](docs/PROJECT_SPEC.md) — Scope, domain, auth, API contract, phased plan  
 - [Engineering Guidelines](docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
+- [CI/CD + EC2 design](docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md) — Approved Phase 2 design (CI first; ECR + EC2 CD scaffold)  
+- [CI/CD implementation plan](docs/superpowers/plans/2026-08-02-ci-cd-implementation.md) — Task breakdown for branch `feature/ci-cd-implementation`  
+

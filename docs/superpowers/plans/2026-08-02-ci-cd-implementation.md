@@ -1,0 +1,351 @@
+# CI/CD Implementation (EC2) Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Add GitHub Actions CI and a low-cost AWS CD scaffold (ECR + EC2 + Docker Compose with Mongo on the same host), after documenting the Phase 2/3 swap.
+
+**Architecture:** CI validates every PR with restore/build/test. CD is Terraform under `infra/` provisioning a minimal public VPC, ECR, and one EC2 that pulls the API image and runs Compose (API + Mongo). ECS is documented as a future evolution only; no `terraform apply` is required to finish the coding tasks.
+
+**Tech Stack:** GitHub Actions, .NET 10, Docker (existing Dockerfile), Terraform (AWS provider), Amazon ECR, EC2 (Amazon Linux 2023), Docker Compose.
+
+**Spec:** [docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md](../specs/2026-08-02-ci-cd-ec2-design.md)
+
+**Branch:** `feature/ci-cd-implementation`
+
+## Global Constraints
+
+- Phase order: Phase 2 = CI/CD; Phase 3 = Redis/RabbitMQ/NotificationLog (do not implement Phase 3 here).
+- No secrets in git or workflow YAML; use GitHub Secrets / `TF_VAR_` only when needed.
+- Reuse `src/TaskFlow.Api/Dockerfile` for any image build.
+- Mongo must not be published to the internet Security Group; only API (and optional SSH from operator IP).
+- Prefer smallest instance class (`t4g.nano` or `t3.micro`); no NAT Gateway, no ALB, no DocumentDB.
+- Documentation language for new infra docs: English (match existing project docs).
+- Do not run `terraform apply` unless the human explicitly asks.
+
+---
+
+## File map
+
+| Path | Role |
+|------|------|
+| `.github/workflows/ci.yml` | CI: restore, build, test |
+| `.github/workflows/cd.yml` | Optional: build/push image to ECR (`workflow_dispatch`) |
+| `infra/**` | Terraform modules + compose for AWS host |
+| `docs/ENGINEERING_GUIDELINES.md` | Phase checklists (already reordered in docs-only pass) |
+| `docs/PROJECT_SPEC.md` | Phased scope (already reordered in docs-only pass) |
+| `README.md` | Link CI/CD docs and branch guidance |
+
+---
+
+### Task 0: Docs-only baseline (completed before coding)
+
+**Files:**
+- Create: `docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md`
+- Create: `docs/superpowers/plans/2026-08-02-ci-cd-implementation.md`
+- Modify: `docs/ENGINEERING_GUIDELINES.md`, `docs/PROJECT_SPEC.md`, `README.md`
+
+- [x] **Step 1: Record approved design and phase swap in docs** (this documentation pass)
+
+- [ ] **Step 2: Create working branch when implementation starts**
+
+```bash
+git checkout main
+git pull
+git checkout -b feature/ci-cd-implementation
+```
+
+Expected: branch `feature/ci-cd-implementation` checked out.
+
+---
+
+### Task 1: GitHub Actions CI workflow
+
+**Files:**
+- Create: `.github/workflows/ci.yml`
+- Modify: `README.md` (CI badge optional; document how CI runs)
+
+**Interfaces:**
+- Consumes: `TaskFlow.slnx` (or solution file at repo root), test projects under `tests/`
+- Produces: green check on push/PR when restore/build/test succeed
+
+- [ ] **Step 1: Add CI workflow file**
+
+Create `.github/workflows/ci.yml`:
+
+```yaml
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Cache NuGet
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c Release --verbosity minimal
+
+      - name: Test
+        run: dotnet test --no-build -c Release --verbosity normal
+```
+
+- [ ] **Step 2: Verify locally that the same commands pass**
+
+```bash
+dotnet restore
+dotnet build --no-restore -c Release
+dotnet test --no-build -c Release
+```
+
+Expected: all projects build; all tests pass (same as CI).
+
+- [ ] **Step 3: Mark Engineering Guidelines CI checkbox when workflow is merged/green**
+
+In `docs/ENGINEERING_GUIDELINES.md` Phase 2 → GitHub Actions, check **CI workflow** after the first green run on GitHub.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add .github/workflows/ci.yml README.md docs/ENGINEERING_GUIDELINES.md
+git commit -m "$(cat <<'EOF'
+ci: add GitHub Actions workflow for restore, build, and test
+
+EOF
+)"
+```
+
+---
+
+### Task 2: Terraform root and network module
+
+**Files:**
+- Create: `infra/versions.tf`, `infra/providers.tf`, `infra/variables.tf`, `infra/outputs.tf`, `infra/main.tf`
+- Create: `infra/modules/network/*.tf`
+- Create: `infra/README.md` (skeleton; expand in Task 5)
+
+**Interfaces:**
+- Produces: VPC id, public subnet id (consumed by compute module)
+
+- [ ] **Step 1: Create provider/version pins**
+
+`infra/versions.tf`:
+
+```hcl
+terraform {
+  required_version = ">= 1.5.0"
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+```
+
+`infra/providers.tf`:
+
+```hcl
+provider "aws" {
+  region = var.aws_region
+}
+```
+
+- [ ] **Step 2: Add network module (VPC + public subnet + IGW)**
+
+Module inputs: `name_prefix`, `vpc_cidr`, `public_subnet_cidr`, `az`.  
+Module outputs: `vpc_id`, `public_subnet_id`.
+
+Constraints: **no NAT Gateway**. Single public subnet is enough for study.
+
+- [ ] **Step 3: Wire module from `infra/main.tf` and add variables**
+
+Variables at minimum: `aws_region`, `name_prefix`, `vpc_cidr`, `public_subnet_cidr`, `allowed_ssh_cidr` (default empty / disabled SSH).
+
+- [ ] **Step 4: Validate**
+
+```bash
+cd infra
+terraform init
+terraform validate
+```
+
+Expected: `Success! The configuration is valid.`
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add infra/
+git commit -m "$(cat <<'EOF'
+infra: add Terraform root and minimal public VPC module
+
+EOF
+)"
+```
+
+---
+
+### Task 3: ECR module
+
+**Files:**
+- Create: `infra/modules/ecr/*.tf`
+- Modify: `infra/main.tf`, `infra/outputs.tf`
+
+**Interfaces:**
+- Produces: `repository_url`, `repository_name` (consumed by compute user-data and CD workflow)
+
+- [ ] **Step 1: Create ECR repository resource**
+
+Repository name default: `taskflow-api`. Enable image scan on push if cheap/default; keep lifecycle simple (optional: expire untagged after N days).
+
+- [ ] **Step 2: Export outputs**
+
+```hcl
+output "ecr_repository_url" {
+  value = module.ecr.repository_url
+}
+```
+
+- [ ] **Step 3: Validate and commit**
+
+```bash
+cd infra && terraform validate
+git add infra/
+git commit -m "$(cat <<'EOF'
+infra: add ECR repository module for the API image
+
+EOF
+)"
+```
+
+---
+
+### Task 4: Compute module (EC2 + IAM + SG + user-data) and AWS Compose
+
+**Files:**
+- Create: `infra/modules/compute/*.tf`
+- Create: `infra/templates/user-data.sh.tpl`
+- Create: `infra/compose/docker-compose.aws.yml`
+- Modify: `infra/main.tf`, `infra/variables.tf`, `infra/outputs.tf`
+
+**Interfaces:**
+- Consumes: `vpc_id`, `public_subnet_id`, `ecr_repository_url`
+- Produces: `public_ip`, health URL hint
+
+- [ ] **Step 1: Security group**
+
+Inbound:
+- TCP 8080 (or 80) from `0.0.0.0/0` **or** a configurable CIDR (prefer variable `allowed_api_cidr`)
+- TCP 22 only if `allowed_ssh_cidr` is non-empty  
+
+Outbound: allow all (needed for ECR pull and Mongo image pull).
+
+Do **not** open Mongo `27017` to the world.
+
+- [ ] **Step 2: IAM instance profile**
+
+Permissions: `ecr:GetAuthorizationToken` plus pull actions on the specific repository (`ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, `ecr:BatchCheckLayerAvailability`).
+
+- [ ] **Step 3: `docker-compose.aws.yml`**
+
+Services: `taskflow.api` (image from ECR URL + tag variable) and `mongo` (pinned tag, e.g. `mongo:8.0`), shared bridge network, named volume for Mongo data. API env for `MongoDb__ConnectionString` pointing at service name `mongo`. Map host `8080:8080`.
+
+- [ ] **Step 4: user-data template**
+
+Install Docker + Compose plugin on Amazon Linux 2023, authenticate to ECR, write compose file and `.env` (JWT + Mongo passwords from Terraform sensitive vars), `docker compose up -d`.
+
+- [ ] **Step 5: EC2 instance**
+
+AMI: Amazon Linux 2023 (data source). Instance type variable default `t3.micro` (or `t4g.nano` if ARM image/Dockerfile verified). Associate public IP. Attach instance profile and SG.
+
+- [ ] **Step 6: Validate and commit**
+
+```bash
+cd infra && terraform validate
+git add infra/
+git commit -m "$(cat <<'EOF'
+infra: add EC2 compute module with Docker Compose API and Mongo
+
+EOF
+)"
+```
+
+---
+
+### Task 5: Infra README + optional CD workflow skeleton
+
+**Files:**
+- Modify: `infra/README.md`
+- Create: `.github/workflows/cd.yml` (skeleton)
+- Modify: `docs/ENGINEERING_GUIDELINES.md` (checkboxes as items land)
+- Modify: `README.md` (link to `infra/README.md` and design spec)
+
+- [ ] **Step 1: Document apply/destroy and cost**
+
+`infra/README.md` must include:
+- Prerequisites (AWS CLI, Terraform, credentials)
+- `terraform init/plan/apply/destroy` examples
+- Required variables (`jwt_secret`, etc.) via `TF_VAR_` or `terraform.tfvars` (**gitignored**)
+- Reminder to destroy when idle
+- Future ECS evolution paragraph (same ECR image → Fargate + ALB; Mongo off-box)
+
+- [ ] **Step 2: Add optional CD workflow skeleton**
+
+`.github/workflows/cd.yml` with `workflow_dispatch`, build using `src/TaskFlow.Api/Dockerfile`, tag with `github.sha`, push to ECR. Use GitHub OIDC or access keys via Secrets — document the chosen approach in the workflow comments and `infra/README.md`. Do not hardcode keys.
+
+- [ ] **Step 3: Update root README Features/Docs**
+
+Point to Phase 2 CI/CD, design spec, and infra README. Note Cache/Messaging is Phase 3.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add infra/README.md .github/workflows/cd.yml README.md docs/ENGINEERING_GUIDELINES.md
+git commit -m "$(cat <<'EOF'
+docs: document AWS infra usage and optional ECR publish workflow
+
+EOF
+)"
+```
+
+---
+
+### Task 6: Verification gate (before claiming Phase 2 coding done)
+
+- [ ] **Step 1: CI green on GitHub** for a PR from `feature/ci-cd-implementation`
+
+- [ ] **Step 2: `terraform validate` succeeds** under `infra/`
+
+- [ ] **Step 3: Confirm Phase 3 items untouched** (no Redis/RabbitMQ code)
+
+- [ ] **Step 4: Spec self-check** — every Decision D1–D8 in the design has a corresponding task or explicit “docs only” note
+
+Only after Steps 1–3: mark Phase 2 CI/CD checklist items in `ENGINEERING_GUIDELINES.md` and open PR.
+
+---
+
+## Execution notes
+
+- **Docs-only pass (current):** Tasks that only edit planning/spec/guidelines may already be done; start coding at Task 0 Step 2 / Task 1 when the human asks to implement.
+- **Do not `terraform apply`** unless explicitly requested.
+- Prefer small commits per task above.
