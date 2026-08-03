@@ -64,6 +64,16 @@ Starts the API and MongoDB. Health check: `GET /health`.
 dotnet test
 ```
 
+### Continuous Integration
+
+GitHub Actions runs on pushes to `main` / `dev` and on pull requests to `main` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
+
+```bash
+dotnet restore TaskFlow.slnx
+dotnet build TaskFlow.slnx --no-restore -c Release
+dotnet test TaskFlow.slnx --no-build -c Release
+```
+
 ## Project Structure
 
 Clean Architecture layout with CQRS and MediatR:
