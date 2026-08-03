@@ -61,8 +61,10 @@ Starts the API and MongoDB. Health check: `GET /health`.
 ### Run tests
 
 ```bash
-dotnet test
+dotnet test TaskFlow.slnx
 ```
+
+Infrastructure tests use [Testcontainers](https://dotnet.testcontainers.org/) (`mongo:8.0`) and require **Docker** running locally (same requirement as GitHub Actions runners).
 
 ### Continuous Integration
 
