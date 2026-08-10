@@ -151,6 +151,8 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 ### AWS CD scaffold (study / low cost)
 
 - [ ] **Terraform under `infra/`** — Modules for network (VPC + public subnet, no NAT), ECR, and EC2 compute.
+- [x] **Assume role** — AWS provider assumes operator-owned `terraform-deploy-role` via `terraform_deploy_role_arn` (tfvars; not committed with real account secrets).
+- [x] **Remote state (S3 only)** — Backend with `encrypt` + `use_lockfile` (no DynamoDB); bucket bootstrapped outside the stack; `backend.hcl` gitignored.
 - [ ] **EC2 + Docker Compose** — Single small instance runs API (ECR image) + MongoDB on the same host; Mongo not exposed publicly.
 - [ ] **IAM instance profile** — EC2 can pull from ECR; no long-lived keys baked into the image.
 - [ ] **Destroyable environment** — Documented `terraform destroy` / cost notes in `infra/README.md`.

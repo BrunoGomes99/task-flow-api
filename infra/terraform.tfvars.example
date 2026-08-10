@@ -1,0 +1,8 @@
+aws_region                = "us-east-1"
+terraform_deploy_role_arn = "arn:aws:iam::123456789012:role/terraform-deploy-role"
+
+# Optional overrides:
+# name_prefix         = "taskflow"
+# vpc_cidr            = "10.0.0.0/16"
+# public_subnet_cidr  = "10.0.1.0/24"
+# allowed_ssh_cidr    = ""

@@ -4,6 +4,11 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "terraform_deploy_role_arn" {
+  description = "ARN of the IAM role Terraform assumes for all AWS API calls (e.g. terraform-deploy-role)."
+  type        = string
+}
+
 variable "name_prefix" {
   description = "Prefix applied to resource names and tags."
   type        = string

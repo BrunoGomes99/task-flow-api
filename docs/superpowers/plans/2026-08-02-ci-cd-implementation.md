@@ -4,9 +4,9 @@
 
 **Goal:** Add GitHub Actions CI and a low-cost AWS CD scaffold (ECR + EC2 + Docker Compose with Mongo on the same host), after documenting the Phase 2/3 swap.
 
-**Architecture:** CI validates every PR with restore/build/test. CD is Terraform under `infra/` provisioning a minimal public VPC, ECR, and one EC2 that pulls the API image and runs Compose (API + Mongo). ECS is documented as a future evolution only; no `terraform apply` is required to finish the coding tasks.
+**Architecture:** CI validates every PR with restore/build/test. CD is Terraform under `infra/` provisioning a minimal public VPC, ECR, and one EC2 that pulls the API image and runs Compose (API + Mongo). After the network module, wire **AWS provider `assume_role`** to the operator’s `terraform-deploy-role` and an **S3 remote backend** with native lockfile (no DynamoDB). ECS is documented as a future evolution only; no `terraform apply` is required to finish the coding tasks.
 
-**Tech Stack:** GitHub Actions, .NET 10, Docker (existing Dockerfile), Terraform (AWS provider), Amazon ECR, EC2 (Amazon Linux 2023), Docker Compose.
+**Tech Stack:** GitHub Actions, .NET 10, Docker (existing Dockerfile), Terraform (AWS provider), Amazon S3 (remote state + `use_lockfile`), Amazon ECR, EC2 (Amazon Linux 2023), Docker Compose.
 
 **Spec:** [docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md](../specs/2026-08-02-ci-cd-ec2-design.md)
 
@@ -21,6 +21,8 @@
 - Prefer smallest instance class (`t4g.nano` or `t3.micro`); no NAT Gateway, no ALB, no DocumentDB.
 - Documentation language for new infra docs: English (match existing project docs).
 - Do not run `terraform apply` unless the human explicitly asks.
+- Terraform AWS provider must `assume_role` to the deploy role (ARN via variable / tfvars; role name expected: `terraform-deploy-role`). Do not hardcode account-specific ARNs in committed examples beyond placeholders.
+- Remote state: S3 backend only with `use_lockfile = true` (no DynamoDB). Bucket is bootstrapped **outside** this stack (manual or one-off); never commit real `backend.hcl` / `*.tfvars` with account secrets.
 
 ---
 
@@ -34,6 +36,9 @@
 | `.github/workflows/ci.yml`       | CI: restore, build, test                                |
 | `.github/workflows/cd.yml`       | Optional: build/push image to ECR (`workflow_dispatch`) |
 | `infra/**`                       | Terraform modules + compose for AWS host                |
+| `infra/backend.tf`               | S3 remote state + `use_lockfile` (no DynamoDB)          |
+| `infra/backend.hcl.example`      | Example partial backend config (bucket/key/region)      |
+| `infra/terraform.tfvars.example` | Example vars including `terraform_deploy_role_arn`      |
 | `docs/ENGINEERING_GUIDELINES.md` | Phase checklists (already reordered in docs-only pass)  |
 | `docs/PROJECT_SPEC.md`           | Phased scope (already reordered in docs-only pass)      |
 | `README.md`                      | Link CI/CD docs and branch guidance                     |
@@ -161,7 +166,7 @@ EOF
 
 - Produces: VPC id, public subnet id (consumed by compute module)
 
-- [ ] **Step 1: Create provider/version pins**
+- [x] **Step 1: Create provider/version pins**
 
 `infra/versions.tf`:
 
@@ -177,7 +182,7 @@ terraform {
 }
 ```
 
-`infra/providers.tf`:
+`infra/providers.tf` (initial; Task 3 adds `assume_role`):
 
 ```hcl
 provider "aws" {
@@ -185,18 +190,18 @@ provider "aws" {
 }
 ```
 
-- [ ] **Step 2: Add network module (VPC + public subnet + IGW)**
+- [x] **Step 2: Add network module (VPC + public subnet + IGW)**
 
 Module inputs: `name_prefix`, `vpc_cidr`, `public_subnet_cidr`, `az`.  
 Module outputs: `vpc_id`, `public_subnet_id`.
 
 Constraints: **no NAT Gateway**. Single public subnet is enough for study.
 
-- [ ] **Step 3: Wire module from** `infra/main.tf` **and add variables**
+- [x] **Step 3: Wire module from** `infra/main.tf` **and add variables**
 
 Variables at minimum: `aws_region`, `name_prefix`, `vpc_cidr`, `public_subnet_cidr`, `allowed_ssh_cidr` (default empty / disabled SSH).
 
-- [ ] **Step 4: Validate**
+- [x] **Step 4: Validate**
 
 ```bash
 cd infra
@@ -206,7 +211,7 @@ terraform validate
 
 Expected: `Success! The configuration is valid.`
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add infra/
@@ -221,7 +226,119 @@ EOF
 
 
 
-### Task 3: ECR module
+### Task 3: Provider assume_role + S3 remote backend
+
+**Files:**
+
+- Modify: `infra/providers.tf`, `infra/variables.tf`, `infra/versions.tf` (required_version note if needed)
+- Create: `infra/backend.tf`, `infra/backend.hcl.example`, `infra/terraform.tfvars.example`
+- Modify: `.gitignore` (ensure `backend.hcl`, `*.tfvars` except `*.tfvars.example`, `.terraform/` remain ignored)
+- Modify: `infra/README.md` (short auth + backend bootstrap notes; full docs still expand in Task 6)
+
+**Interfaces:**
+
+- Consumes: operator base credentials (SSO/profile/keys) that can `sts:AssumeRole` on `terraform-deploy-role`
+- Consumes: pre-existing S3 bucket for state (created **outside** this stack)
+- Produces: provider sessions via assumed role; remote state config ready for `terraform init -backend-config=backend.hcl`
+
+- [x] **Step 1: Add `terraform_deploy_role_arn` and wire `assume_role`**
+
+In `infra/variables.tf`:
+
+```hcl
+variable "terraform_deploy_role_arn" {
+  description = "ARN of the IAM role Terraform assumes for all AWS API calls (e.g. terraform-deploy-role)."
+  type        = string
+}
+```
+
+In `infra/providers.tf`:
+
+```hcl
+provider "aws" {
+  region = var.aws_region
+
+  assume_role {
+    role_arn     = var.terraform_deploy_role_arn
+    session_name = "taskflow-terraform"
+  }
+}
+```
+
+Commit an example only (no real account id):
+
+`infra/terraform.tfvars.example`:
+
+```hcl
+aws_region                 = "us-east-1"
+terraform_deploy_role_arn  = "arn:aws:iam::123456789012:role/terraform-deploy-role"
+```
+
+Operator copies to `terraform.tfvars` (gitignored) and replaces the account id / ARN.
+
+- [x] **Step 2: Add S3 backend with native lockfile (no DynamoDB)**
+
+`infra/backend.tf`:
+
+```hcl
+terraform {
+  backend "s3" {
+    # bucket, key, region supplied via -backend-config=backend.hcl (see backend.hcl.example)
+    encrypt      = true
+    use_lockfile = true
+  }
+}
+```
+
+`infra/backend.hcl.example`:
+
+```hcl
+bucket = "your-taskflow-tfstate-bucket"
+key    = "taskflow/infra/terraform.tfstate"
+region = "us-east-1"
+```
+
+Document bootstrap in `infra/README.md` (English):
+
+1. Create an S3 bucket manually (versioning on, block public access, encryption).
+2. Ensure the **base** identity (and/or `terraform-deploy-role`) can read/write the state prefix and lock object.
+3. Copy `backend.hcl.example` → `backend.hcl` and `terraform.tfvars.example` → `terraform.tfvars`; fill real values.
+4. `terraform init -backend-config=backend.hcl` (use `-migrate-state` if local state already exists).
+
+Do **not** manage the state bucket inside this same root (chicken-and-egg). Do **not** add DynamoDB.
+
+- [x] **Step 3: Validate**
+
+With `terraform.tfvars` present locally (not committed), or by passing `-var` for the role ARN:
+
+```bash
+cd infra
+terraform init -backend-config=backend.hcl
+terraform validate
+```
+
+If the human has not created the bucket yet, `validate` after a local/temporary init is acceptable for the coding task; document that full remote init requires the bucket. Prefer real `init -backend-config=...` when the bucket exists.
+
+Expected: `Success! The configuration is valid.`
+
+Still **do not** `terraform apply` unless the human explicitly asks.
+
+- [x] **Step 4: Commit**
+
+```bash
+git add infra/providers.tf infra/variables.tf infra/backend.tf infra/backend.hcl.example infra/terraform.tfvars.example infra/README.md .gitignore
+git commit -m "$(cat <<'EOF'
+infra: assume terraform-deploy-role and use S3 remote state with lockfile
+
+EOF
+)"
+```
+
+---
+
+
+
+### Task 4: ECR module
 
 **Files:**
 
@@ -260,7 +377,7 @@ EOF
 
 
 
-### Task 4: Compute module (EC2 + IAM + SG + user-data) and AWS Compose
+### Task 5: Compute module (EC2 + IAM + SG + user-data) and AWS Compose
 
 **Files:**
 
@@ -317,7 +434,7 @@ EOF
 
 
 
-### Task 5: Infra README + optional CD workflow skeleton
+### Task 6: Infra README + optional CD workflow skeleton
 
 **Files:**
 
@@ -330,15 +447,16 @@ EOF
 
 `infra/README.md` must include:
 
-- Prerequisites (AWS CLI, Terraform, credentials)
-- `terraform init/plan/apply/destroy` examples
-- Required variables (`jwt_secret`, etc.) via `TF_VAR_` or `terraform.tfvars` (**gitignored**)
+- Prerequisites (AWS CLI, Terraform, base credentials that can assume `terraform-deploy-role`)
+- S3 state bucket bootstrap + `backend.hcl` / `terraform.tfvars` setup (`use_lockfile`, no DynamoDB)
+- `terraform init -backend-config=backend.hcl` / `plan` / `apply` / `destroy` examples
+- Required variables (`terraform_deploy_role_arn`, `jwt_secret`, etc.) via `TF_VAR_` or `terraform.tfvars` (**gitignored**)
 - Reminder to destroy when idle
 - Future ECS evolution paragraph (same ECR image → Fargate + ALB; Mongo off-box)
 
 - [ ] **Step 2: Add optional CD workflow skeleton**
 
-`.github/workflows/cd.yml` with `workflow_dispatch`, build using `src/TaskFlow.Api/Dockerfile`, tag with `github.sha`, push to ECR. Use GitHub OIDC or access keys via Secrets — document the chosen approach in the workflow comments and `infra/README.md`. Do not hardcode keys.
+`.github/workflows/cd.yml` with `workflow_dispatch`, build using `src/TaskFlow.Api/Dockerfile`, tag with `github.sha`, push to ECR. Prefer GitHub OIDC assuming a deploy role (same or sibling of `terraform-deploy-role`) — document the chosen approach in the workflow comments and `infra/README.md`. Do not hardcode keys.
 
 - [ ] **Step 3: Update root README Features/Docs**
 
@@ -359,15 +477,15 @@ EOF
 
 
 
-### Task 6: Verification gate (before claiming Phase 2 coding done)
+### Task 7: Verification gate (before claiming Phase 2 coding done)
 
 - [ ] **Step 1: CI green on GitHub** for a PR from `feature/ci-cd-implementation`
 
-- [ ] **Step 2:** `terraform validate` **succeeds** under `infra/`
+- [ ] **Step 2:** `terraform validate` **succeeds** under `infra/` (with backend/role examples in place)
 
 - [ ] **Step 3: Confirm Phase 3 items untouched** (no Redis/RabbitMQ code)
 
-- [ ] **Step 4: Spec self-check** — every Decision D1–D8 in the design has a corresponding task or explicit “docs only” note
+- [ ] **Step 4: Spec self-check** — every Decision D1–D9 in the design has a corresponding task or explicit “docs only” note
 
 Only after Steps 1–3: mark Phase 2 CI/CD checklist items in `ENGINEERING_GUIDELINES.md` and open PR.
 
@@ -377,7 +495,8 @@ Only after Steps 1–3: mark Phase 2 CI/CD checklist items in `ENGINEERING_GUIDE
 
 ## Execution notes
 
-- **Docs-only pass (current):** Tasks that only edit planning/spec/guidelines may already be done; start coding at Task 0 Step 2 / Task 1 when the human asks to implement.
+- **Status:** Tasks 0–3 complete. **Next:** Task 4 (ECR), then compute (Task 5), docs/CD (Task 6), verification (Task 7).
 - **Do not** `terraform apply` unless explicitly requested.
 - Prefer small commits per task above.
+- State bucket and IAM role `terraform-deploy-role` are **operator-owned prerequisites** for Task 3; the repo only wires Terraform to them.
 

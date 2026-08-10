@@ -76,6 +76,13 @@ Documented only in this cycle:
 - Later: ECS task definition + Fargate service + ALB  
 - Move Mongo off the EC2 host to a managed store when adopting ECS  
 
+### D9 — Terraform auth + remote state (study hardening)
+
+- AWS provider uses **`assume_role`** to an operator-owned IAM role named **`terraform-deploy-role`** (ARN passed via `terraform_deploy_role_arn` / tfvars; not hardcoded with a real account id in git).  
+- Base credentials (SSO/profile/keys) must be allowed to assume that role; the role holds least-privilege deploy permissions.  
+- **Remote state:** S3 backend only, `encrypt = true`, **`use_lockfile = true`** (no DynamoDB).  
+- State bucket is **bootstrapped outside** the TaskFlow `infra/` root (chicken-and-egg). Partial config via `backend.hcl` (gitignored; commit `backend.hcl.example` only).  
+
 ## Architecture
 
 ```text
@@ -105,10 +112,13 @@ Developer → GitHub (PR/push)
 infra/
   README.md
   versions.tf
-  providers.tf
+  providers.tf          # assume_role → terraform-deploy-role
   variables.tf
   outputs.tf
   main.tf
+  backend.tf            # S3 + use_lockfile (no DynamoDB)
+  backend.hcl.example
+  terraform.tfvars.example
   modules/
     network/
     ecr/
@@ -139,8 +149,10 @@ docs/superpowers/plans/
 | `modules/network` | VPC, subnet, IGW, route table |
 | `modules/ecr` | ECR repository `taskflow-api` |
 | `modules/compute` | SG, IAM instance profile, EC2, user-data |
+| `providers.tf` | `assume_role` → `terraform-deploy-role` (ARN via tfvars) |
+| `backend.tf` | S3 remote state + `use_lockfile` (no DynamoDB) |
 | `compose/docker-compose.aws.yml` | API + Mongo on host |
-| `infra/README.md` | apply/destroy, cost notes, SSH guidance |
+| `infra/README.md` | apply/destroy, auth/backend bootstrap, cost notes, SSH guidance |
 
 **Outputs (examples):** ECR repository URL, public IP / DNS, suggested health URL (`http://<ip>:8080/health`).
 
@@ -150,6 +162,7 @@ docs/superpowers/plans/
 - [ ] Design + implementation plan committed in `docs/superpowers/`  
 - [ ] CI workflow green on PR (when implementation starts)  
 - [ ] `infra/` present and documented; `terraform validate` passes locally when Terraform is installed  
+- [ ] Provider assumes `terraform-deploy-role`; state uses S3 + `use_lockfile` (examples committed, secrets/tfvars/backend.hcl gitignored)  
 - [ ] Operator can apply and destroy without leftover billable resources (documented checklist)  
 
 ## Out of scope reminders
