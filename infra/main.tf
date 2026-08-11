@@ -10,3 +10,9 @@ module "network" {
   public_subnet_cidr = var.public_subnet_cidr
   az                 = data.aws_availability_zones.available.names[0]
 }
+
+module "ecr" {
+  source = "./modules/ecr"
+
+  repository_name = var.ecr_repository_name
+}

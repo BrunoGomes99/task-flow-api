@@ -6,3 +6,4 @@ terraform_deploy_role_arn = "arn:aws:iam::123456789012:role/terraform-deploy-rol
 # vpc_cidr            = "10.0.0.0/16"
 # public_subnet_cidr  = "10.0.1.0/24"
 # allowed_ssh_cidr    = ""
+# ecr_repository_name = "taskflow-api"

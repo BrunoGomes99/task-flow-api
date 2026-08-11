@@ -349,11 +349,11 @@ EOF
 
 - Produces: `repository_url`, `repository_name` (consumed by compute user-data and CD workflow)
 
-- [ ] **Step 1: Create ECR repository resource**
+- [x] **Step 1: Create ECR repository resource**
 
 Repository name default: `taskflow-api`. Enable image scan on push if cheap/default; keep lifecycle simple (optional: expire untagged after N days).
 
-- [ ] **Step 2: Export outputs**
+- [x] **Step 2: Export outputs**
 
 ```hcl
 output "ecr_repository_url" {
@@ -361,7 +361,7 @@ output "ecr_repository_url" {
 }
 ```
 
-- [ ] **Step 3: Validate and commit**
+- [x] **Step 3: Validate and commit**
 
 ```bash
 cd infra && terraform validate
@@ -495,7 +495,7 @@ Only after Steps 1–3: mark Phase 2 CI/CD checklist items in `ENGINEERING_GUIDE
 
 ## Execution notes
 
-- **Status:** Tasks 0–3 complete. **Next:** Task 4 (ECR), then compute (Task 5), docs/CD (Task 6), verification (Task 7).
+- **Status:** Tasks 0–4 complete. **Next:** Task 5 (compute), then docs/CD (Task 6), verification (Task 7).
 - **Do not** `terraform apply` unless explicitly requested.
 - Prefer small commits per task above.
 - State bucket and IAM role `terraform-deploy-role` are **operator-owned prerequisites** for Task 3; the repo only wires Terraform to them.

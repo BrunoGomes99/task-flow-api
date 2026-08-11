@@ -32,3 +32,9 @@ variable "allowed_ssh_cidr" {
   type        = string
   default     = ""
 }
+
+variable "ecr_repository_name" {
+  description = "Name of the ECR repository for the TaskFlow API image."
+  type        = string
+  default     = "taskflow-api"
+}
