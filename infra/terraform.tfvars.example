@@ -1,9 +1,19 @@
 aws_region                = "us-east-1"
 terraform_deploy_role_arn = "arn:aws:iam::123456789012:role/terraform-deploy-role"
 
+# Required secrets (placeholders only — replace in gitignored terraform.tfvars):
+jwt_secret          = "replace-with-a-32-character-or-longer-secret"
+mongo_root_password = "replace-with-a-strong-mongo-password"
+
 # Optional overrides:
 # name_prefix         = "taskflow"
 # vpc_cidr            = "10.0.0.0/16"
 # public_subnet_cidr  = "10.0.1.0/24"
+# allowed_api_cidr    = "0.0.0.0/0"
 # allowed_ssh_cidr    = ""
 # ecr_repository_name = "taskflow-api"
+# instance_type       = "t3.micro"
+# api_image_tag       = "latest"
+# jwt_issuer          = "TaskFlow"
+# jwt_audience        = "TaskFlow.Api"
+# mongo_root_username = "taskflow"
