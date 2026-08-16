@@ -34,12 +34,13 @@ locals {
     "JWT_AUDIENCE=${var.jwt_audience}",
     "",
   ])
-  user_data = templatefile("${path.root}/templates/user-data.sh.tpl", {
+  user_data_raw = templatefile("${path.root}/templates/user-data.sh.tpl", {
     aws_region   = var.aws_region
     ecr_registry = split("/", var.ecr_repository_url)[0]
     compose_b64  = base64encode(local.compose_yaml)
     env_b64      = base64encode(local.env_file)
   })
+  user_data = replace(replace(local.user_data_raw, "\r\n", "\n"), "\r", "\n")
 }
 
 resource "aws_instance" "this" {
