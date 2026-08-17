@@ -10,9 +10,9 @@ Invert the previous Phase 2 / Phase 3 order so **CI/CD comes before Redis/Rabbit
 
 This cycle delivers:
 
-1. **CI (to implement):** GitHub Actions restore → build → test  
-2. **CD (design + Terraform scaffold; no mandatory `apply`):** ECR + EC2 + Docker Compose (API + Mongo on the same instance)  
-3. **Docs:** phase reorder, README, evolution path toward ECS  
+1. **CI (implemented):** GitHub Actions restore → build → test  
+2. **CD (scaffold):** ECR + EC2 + Docker Compose (API + Mongo on the same instance); publish to ECR after Environment `production` approval (OIDC)  
+3. **Docs:** phase reorder, README, infra apply/destroy, evolution path toward ECS 
 
 ## Non-goals (this cycle)
 
@@ -39,7 +39,8 @@ This cycle delivers:
 
 - Implement `.github/workflows/ci.yml` so every push/PR validates the solution.  
 - Author Terraform under `infra/` and CD docs; **do not require** `terraform apply` to close the phase.  
-- Optional later: `workflow_dispatch` CD workflow to build/push the image to ECR.
+- **CD (adopted):** single pipeline on `main` — after CI succeeds, GitHub Environment **`production`** required-reviewer gate, then build/push the API image to ECR via OIDC. `workflow_dispatch` remains an escape hatch to re-publish without a new commit.  
+- Publish means **image promotion to ECR** in this cycle; the EC2 Compose host does not auto-redeploy (documented separately; ECS is the future path).
 
 ### D4 — Compute: EC2 + Docker (not App Runner)
 
@@ -67,6 +68,7 @@ Chosen for learning company-style EC2 patterns and as a stepping stone to **ECS*
 - No secrets in git or workflow YAML  
 - JWT / Mongo credentials via Terraform variables / generated `.env` on the instance (never committed)  
 - GitHub Actions CI needs **no** cloud secrets for the default test job  
+- ECR publish uses **GitHub OIDC** + repository Variables (`AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `ECR_REPOSITORY`); no long-lived AWS access keys in Actions 
 
 ### D8 — Future evolution: ECS
 
@@ -92,12 +94,17 @@ Developer → GitHub (PR/push)
      GitHub Actions CI
      restore / build / test
               │
-              │  (later / manual CD)
+              │  push to main (CI green)
               ▼
-     Docker build → Amazon ECR
+     Environment "production"
+     (manual Approve)
               │
               ▼
-     EC2 (user-data)
+     Docker build → Amazon ECR
+     (OIDC; tags: sha + latest)
+              │
+              ▼
+     EC2 (user-data on boot)
        docker compose up
          ├─ taskflow.api  (ECR image)
          └─ mongo         (local volume)
@@ -107,8 +114,7 @@ Developer → GitHub (PR/push)
 
 ```text
 .github/workflows/
-  ci.yml
-  cd.yml                    # optional skeleton: build/push ECR
+  ci.yml                    # CI + ECR publish behind Environment production
 infra/
   README.md
   versions.tf
@@ -152,18 +158,20 @@ docs/superpowers/plans/
 | `providers.tf` | `assume_role` → `terraform-deploy-role` (ARN via tfvars) |
 | `backend.tf` | S3 remote state + `use_lockfile` (no DynamoDB) |
 | `compose/docker-compose.aws.yml` | API + Mongo on host |
-| `infra/README.md` | apply/destroy, auth/backend bootstrap, cost notes, SSH guidance |
+| `infra/README.md` | apply/destroy, auth/backend bootstrap, cost notes, SSH guidance, OIDC publish, ECS notes |
+| `.github/workflows/ci.yml` | CI + Environment `production` gate → ECR push (OIDC) |
 
 **Outputs (examples):** ECR repository URL, public IP / DNS, suggested health URL (`http://<ip>:8080/health`).
 
 ## Success criteria
 
-- [ ] Phase numbers updated in Engineering Guidelines and Project Spec  
-- [ ] Design + implementation plan committed in `docs/superpowers/`  
-- [ ] CI workflow green on PR (when implementation starts)  
-- [ ] `infra/` present and documented; `terraform validate` passes locally when Terraform is installed  
-- [ ] Provider assumes `terraform-deploy-role`; state uses S3 + `use_lockfile` (examples committed, secrets/tfvars/backend.hcl gitignored)  
-- [ ] Operator can apply and destroy without leftover billable resources (documented checklist)  
+- [x] Phase numbers updated in Engineering Guidelines and Project Spec  
+- [x] Design + implementation plan committed in `docs/superpowers/`  
+- [ ] CI workflow green on PR (when implementation starts) — tracked in plan Task 7  
+- [x] `infra/` present and documented; `terraform validate` passes locally when Terraform is installed  
+- [x] Provider assumes `terraform-deploy-role`; state uses S3 + `use_lockfile` (examples committed, secrets/tfvars/backend.hcl gitignored)  
+- [x] Operator can apply and destroy without leftover billable resources (documented checklist)  
+- [x] Single CI/CD workflow: publish to ECR after Environment `production` approval (OIDC; no static keys)
 
 ## Out of scope reminders
 

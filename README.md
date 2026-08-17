@@ -7,7 +7,7 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 - **User** — Register, login (JWT), get profile
 - **Tasks** — Full CRUD, paginated list (filters: title, description, status; sort by due date)
 - **Auth** — JWT (no ASP.NET Identity), BCrypt password hashing, multi-tenancy via `UserId` from token
-- **Planned (Phase 2)** — GitHub Actions CI, ECR publish, Terraform AWS study stack (EC2 + Docker Compose)
+- **Phase 2 (in progress)** — GitHub Actions CI + ECR publish behind Environment `production`; Terraform AWS study stack (ECR + EC2 + Docker Compose)
 - **Planned (Phase 3)** — Redis cache (Cache Aside), RabbitMQ events, NotificationLog persistence
 
 ## Tech Stack
@@ -66,15 +66,22 @@ dotnet test TaskFlow.slnx
 
 Infrastructure tests use [Testcontainers](https://dotnet.testcontainers.org/) (`mongo:8.0`) and require **Docker** running locally (same requirement as GitHub Actions runners).
 
-### Continuous Integration
+### Continuous Integration / Delivery
 
-GitHub Actions runs on pushes to `main` / `dev` and on pull requests to `main` (see [`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs a **single pipeline**:
+
+1. **CI** — on pushes to `main` / `dev` and on pull requests to `main`: restore, build, test.
+2. **Publish to ECR** — only after CI succeeds on push to `main` (or `workflow_dispatch`), paused on the GitHub Environment **`production`** until someone clicks Approve. Uses OIDC (no long-lived AWS keys in YAML). Tags: `github.sha` and `latest`.
+
+Local equivalent of the CI job:
 
 ```bash
 dotnet restore TaskFlow.slnx
 dotnet build TaskFlow.slnx --no-restore -c Release
 dotnet test TaskFlow.slnx --no-build -c Release
 ```
+
+AWS apply/destroy, OIDC variables, and EC2 notes: [infra/README.md](infra/README.md). Cache/Messaging remains **Phase 3**.
 
 ## Project Structure
 
@@ -112,4 +119,5 @@ tests/
 - [Engineering Guidelines](docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
 - [CI/CD + EC2 design](docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md) — Approved Phase 2 design (CI first; ECR + EC2 CD scaffold)  
 - [CI/CD implementation plan](docs/superpowers/plans/2026-08-02-ci-cd-implementation.md) — Task breakdown for branch `feature/ci-cd-implementation`  
+- [Infrastructure (Terraform)](infra/README.md) — Auth, S3 state, apply/destroy, ECR publish gate, ECS evolution notes  
 

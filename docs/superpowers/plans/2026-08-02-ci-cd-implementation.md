@@ -31,17 +31,16 @@
 ## File map
 
 
-| Path                             | Role                                                    |
-| -------------------------------- | ------------------------------------------------------- |
-| `.github/workflows/ci.yml`       | CI: restore, build, test                                |
-| `.github/workflows/cd.yml`       | Optional: build/push image to ECR (`workflow_dispatch`) |
-| `infra/**`                       | Terraform modules + compose for AWS host                |
-| `infra/backend.tf`               | S3 remote state + `use_lockfile` (no DynamoDB)          |
-| `infra/backend.hcl.example`      | Example partial backend config (bucket/key/region)      |
-| `infra/terraform.tfvars.example` | Example vars including `terraform_deploy_role_arn`      |
-| `docs/ENGINEERING_GUIDELINES.md` | Phase checklists (already reordered in docs-only pass)  |
-| `docs/PROJECT_SPEC.md`           | Phased scope (already reordered in docs-only pass)      |
-| `README.md`                      | Link CI/CD docs and branch guidance                     |
+| Path                             | Role                                                                 |
+| -------------------------------- | -------------------------------------------------------------------- |
+| `.github/workflows/ci.yml`       | CI + ECR publish behind Environment `production` (OIDC)              |
+| `infra/**`                       | Terraform modules + compose for AWS host                             |
+| `infra/backend.tf`               | S3 remote state + `use_lockfile` (no DynamoDB)                       |
+| `infra/backend.hcl.example`      | Example partial backend config (bucket/key/region)                   |
+| `infra/terraform.tfvars.example` | Example vars including `terraform_deploy_role_arn`                   |
+| `docs/ENGINEERING_GUIDELINES.md` | Phase checklists (already reordered in docs-only pass)               |
+| `docs/PROJECT_SPEC.md`           | Phased scope (already reordered in docs-only pass)                   |
+| `README.md`                      | Link CI/CD docs and branch guidance                                  |
 
 
 ---
@@ -391,7 +390,7 @@ EOF
 - Consumes: `vpc_id`, `public_subnet_id`, `ecr_repository_url`
 - Produces: `public_ip`, health URL hint
 
-- [ ] **Step 1: Security group**
+- [x] **Step 1: Security group**
 
 Inbound:
 
@@ -402,23 +401,23 @@ Outbound: allow all (needed for ECR pull and Mongo image pull).
 
 Do **not** open Mongo `27017` to the world.
 
-- [ ] **Step 2: IAM instance profile**
+- [x] **Step 2: IAM instance profile**
 
 Permissions: `ecr:GetAuthorizationToken` plus pull actions on the specific repository (`ecr:BatchGetImage`, `ecr:GetDownloadUrlForLayer`, `ecr:BatchCheckLayerAvailability`).
 
-- [ ] **Step 3:** `docker-compose.aws.yml`
+- [x] **Step 3:** `docker-compose.aws.yml`
 
 Services: `taskflow.api` (image from ECR URL + tag variable) and `mongo` (pinned tag, e.g. `mongo:8.0`), shared bridge network, named volume for Mongo data. API env for `MongoDb__ConnectionString` pointing at service name `mongo`. Map host `8080:8080`.
 
-- [ ] **Step 4: user-data template**
+- [x] **Step 4: user-data template**
 
 Install Docker + Compose plugin on Amazon Linux 2023, authenticate to ECR, write compose file and `.env` (JWT + Mongo passwords from Terraform sensitive vars), `docker compose up -d`.
 
-- [ ] **Step 5: EC2 instance**
+- [x] **Step 5: EC2 instance**
 
 AMI: Amazon Linux 2023 (data source). Instance type variable default `t3.micro` (or `t4g.nano` if ARM image/Dockerfile verified). Associate public IP. Attach instance profile and SG.
 
-- [ ] **Step 6: Validate and commit**
+- [x] **Step 6: Validate and commit**
 
 ```bash
 cd infra && terraform validate
@@ -430,20 +429,25 @@ EOF
 )"
 ```
 
+Follow-up commit: normalize user-data to LF on Windows checkouts.
+
 ---
 
 
 
-### Task 6: Infra README + optional CD workflow skeleton
+### Task 6: Infra README + CI/CD publish gate (format A)
+
+**Decision (2026-08-16):** One workflow on `main` — CI then Environment **`production`** approval → ECR push (OIDC). No separate `cd.yml`. `workflow_dispatch` kept as escape hatch. Publish = image to ECR only; EC2 does not auto-redeploy.
 
 **Files:**
 
 - Modify: `infra/README.md`
-- Create: `.github/workflows/cd.yml` (skeleton)
+- Modify: `.github/workflows/ci.yml` (add `publish-ecr` job; no separate `cd.yml`)
 - Modify: `docs/ENGINEERING_GUIDELINES.md` (checkboxes as items land)
 - Modify: `README.md` (link to `infra/README.md` and design spec)
+- Modify: design spec + this plan (D3 / status)
 
-- [ ] **Step 1: Document apply/destroy and cost**
+- [x] **Step 1: Document apply/destroy and cost**
 
 `infra/README.md` must include:
 
@@ -453,21 +457,22 @@ EOF
 - Required variables (`terraform_deploy_role_arn`, `jwt_secret`, etc.) via `TF_VAR_` or `terraform.tfvars` (**gitignored**)
 - Reminder to destroy when idle
 - Future ECS evolution paragraph (same ECR image → Fargate + ALB; Mongo off-box)
+- GitHub OIDC variables + Environment `production` setup
 
-- [ ] **Step 2: Add optional CD workflow skeleton**
+- [x] **Step 2: Add publish job to CI workflow (format A)**
 
-`.github/workflows/cd.yml` with `workflow_dispatch`, build using `src/TaskFlow.Api/Dockerfile`, tag with `github.sha`, push to ECR. Prefer GitHub OIDC assuming a deploy role (same or sibling of `terraform-deploy-role`) — document the chosen approach in the workflow comments and `infra/README.md`. Do not hardcode keys.
+Extend `.github/workflows/ci.yml`: after `build-and-test`, job `publish-ecr` runs on push to `main` or `workflow_dispatch`, `environment: production`, build using `src/TaskFlow.Api/Dockerfile`, tag with `github.sha` + `latest`, push to ECR via OIDC (`vars.AWS_ROLE_TO_ASSUME`, `AWS_REGION`, `ECR_REPOSITORY`). Do not hardcode keys.
 
-- [ ] **Step 3: Update root README Features/Docs**
+- [x] **Step 3: Update root README Features/Docs**
 
 Point to Phase 2 CI/CD, design spec, and infra README. Note Cache/Messaging is Phase 3.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
-git add infra/README.md .github/workflows/cd.yml README.md docs/ENGINEERING_GUIDELINES.md
+git add infra/README.md .github/workflows/ci.yml README.md docs/ENGINEERING_GUIDELINES.md docs/superpowers/
 git commit -m "$(cat <<'EOF'
-docs: document AWS infra usage and optional ECR publish workflow
+docs: document AWS infra usage and production-gated ECR publish
 
 EOF
 )"
@@ -495,8 +500,9 @@ Only after Steps 1–3: mark Phase 2 CI/CD checklist items in `ENGINEERING_GUIDE
 
 ## Execution notes
 
-- **Status:** Tasks 0–4 complete. **Next:** Task 5 (compute), then docs/CD (Task 6), verification (Task 7).
+- **Status:** Tasks 0–6 complete. **Next:** Task 7 (verification gate / PR).
 - **Do not** `terraform apply` unless explicitly requested.
 - Prefer small commits per task above.
 - State bucket and IAM role `terraform-deploy-role` are **operator-owned prerequisites** for Task 3; the repo only wires Terraform to them.
+- GitHub Environment `production` + OIDC role/variables are **operator-owned prerequisites** for the publish job; CI still runs without them.
 

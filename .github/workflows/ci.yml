@@ -1,3 +1,18 @@
+# Single pipeline (format A): CI on every PR/push; ECR publish only after
+# the GitHub Environment "production" approval gate on main (or manual dispatch).
+#
+# Auth for publish: GitHub OIDC → IAM role (no long-lived AWS keys in the workflow).
+# Configure repo Variables (Settings → Secrets and variables → Actions → Variables):
+#   AWS_REGION          e.g. us-east-1
+#   AWS_ROLE_TO_ASSUME  ARN of a role trustable by GitHub OIDC (ECR push permissions)
+#   ECR_REPOSITORY      e.g. taskflow-api
+#
+# Also create Environment "production" with required reviewers so the publish job waits
+# for a manual Approve click (workplace-style promotion gate).
+#
+# Scope of "deploy" in this phase: build + push image to ECR. The EC2 host does not
+# auto-redeploy; see infra/README.md for pull/up after publish.
+
 name: CI
 
 on:
@@ -5,6 +20,10 @@ on:
     branches: [main, "dev"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build-and-test:
@@ -33,3 +52,42 @@ jobs:
 
       - name: Test
         run: dotnet test TaskFlow.slnx --no-build -c Release --verbosity normal
+
+  publish-ecr:
+    name: Publish API image to ECR
+    needs: build-and-test
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}"
+          docker build -f src/TaskFlow.Api/Dockerfile -t "${IMAGE_URI}:${IMAGE_TAG}" -t "${IMAGE_URI}:latest" .
+          docker push "${IMAGE_URI}:${IMAGE_TAG}"
+          docker push "${IMAGE_URI}:latest"
+          echo "Pushed ${IMAGE_URI}:${IMAGE_TAG} and ${IMAGE_URI}:latest"
