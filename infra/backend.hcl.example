@@ -1,0 +1,3 @@
+bucket = "your-taskflow-tfstate-bucket"
+key    = "taskflow/infra/terraform.tfstate"
+region = "us-east-1"

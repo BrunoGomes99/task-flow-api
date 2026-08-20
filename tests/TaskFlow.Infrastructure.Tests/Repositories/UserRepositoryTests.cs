@@ -1,21 +1,28 @@
-using Mongo2Go;
 using TaskFlow.Domain.ValueObjects;
 using TaskFlow.Infrastructure.Configuration;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
+using TaskFlow.Infrastructure.Tests.Support;
 using DomainUser = TaskFlow.Domain.Entities.User;
 
 namespace TaskFlow.Infrastructure.Tests.Repositories;
 
+[Collection(MongoDbContainerFixture.CollectionName)]
 public sealed class UserRepositoryTests
 {
+    private readonly MongoDbContainerFixture _mongoDb;
+
+    public UserRepositoryTests(MongoDbContainerFixture mongoDb)
+    {
+        _mongoDb = mongoDb;
+    }
+
     [Fact]
     public async System.Threading.Tasks.Task AddAsync_ShouldPersistAndLoadUser_ByIdAndEmail()
     {
-        using var runner = MongoDbRunner.Start();
         var settings = new MongoDbSettings
         {
-            ConnectionString = runner.ConnectionString,
+            ConnectionString = _mongoDb.ConnectionString,
             DatabaseName = $"taskflow-users-{Guid.NewGuid():N}"
         };
 

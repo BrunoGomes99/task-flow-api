@@ -15,9 +15,9 @@ Build a RESTful Web API using **.NET 10** with:
 - SOLID principles and Clean Code practices
 - JWT authentication
 - MongoDB (NoSQL)
-- RabbitMQ and Redis in a later phase
 - Docker containerization
-- GitHub Actions CI/CD in a later phase
+- GitHub Actions CI/CD (Phase 2), with a low-cost AWS study path (ECR + EC2 + Terraform)
+- RabbitMQ and Redis in a later phase (Phase 3)
 - Unit testing with xUnit
 - SonarLint for code quality
 
@@ -39,7 +39,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 - **Domain** — Entities, value objects, domain rules. No dependencies on other layers.
 - **Application** — Use cases (MediatR handlers), interfaces (repositories, services), DTOs, Command/Query Responsibility Segregation (CQRS), FluentValidation validators, pipeline behaviors.
-- **Infrastructure** — Implementations of external concerns: MongoDB, Redis, RabbitMQ.
+- **Infrastructure** — Implementations of external concerns: MongoDB; Redis and RabbitMQ in Phase 3.
 - **API** — Controllers, middleware, filters, and configuration. Controllers send Commands/Queries via `IMediator`.
 - **Tests** — Unit tests for Domain and Application.
 
@@ -83,7 +83,7 @@ The system must be simple in domain complexity but architecturally mature.
 - **Domain validation:** Title required (not null/empty, min and max length); Description optional with max length. Enforced in the entity constructor.
 - **Status transitions:** Allowed: Pending ↔ InProgress, Pending → Completed, InProgress → Completed. Once a task is Completed, its status cannot be changed back. Status is changed via explicit methods: SetPending(), SetInProgress(), SetCompleted(). The frontend may show a warning that completing a task cannot be undone.
 
-**NotificationLog** (Phase 1: entity only; Phase 2: full implementation)
+**NotificationLog** (Phase 1: entity only; Phase 3: full implementation with messaging)
 
 - Id
 - TaskId
@@ -159,7 +159,7 @@ The system must be simple in domain complexity but architecturally mature.
 ## 10. Containerization
 
 - **Phase 1 (done):** Multi-stage **Dockerfile** for the API; **docker-compose** with API + MongoDB; Mongo **healthcheck** and API **`depends_on: service_healthy`**; API **healthcheck** against `GET /health`; connection string via **environment / `.env`** (see `.env.example`); pinned service image tags; optional **mongo-express** for local DB inspection only.
-- **Later:** docker-compose can add RabbitMQ and Redis (Phase 2).
+- **Later:** docker-compose can add RabbitMQ and Redis (Phase 3).
 
 ---
 
@@ -176,16 +176,19 @@ The system must be simple in domain complexity but architecturally mature.
 - Tests: xUnit for Domain and Application (mocks); progressive coverage.
 - Quality: SonarLint, global exception middleware, logging, multi-tenancy by UserId from JWT.
 
-### Phase 2 — Cache and Messaging
+### Phase 2 — CI/CD
+
+- **GitHub Actions:** CI on push/PR (restore, build, test).
+- **Container publish:** build the existing API Dockerfile and push to **Amazon ECR** (optional CD workflow).
+- **AWS study environment (low cost):** Terraform under `infra/` for VPC (public subnet, no NAT), ECR, and a small **EC2** host running Docker Compose (**API + Mongo on the same instance**). Provider assumes IAM role `terraform-deploy-role`; remote state on **S3** with `use_lockfile` (no DynamoDB). Environment must be easy to destroy when idle.
+- **Future (documented only):** evolve the same ECR image to **ECS** (Fargate + ALB); move Mongo off the EC2 host. On ECS, pin the running task to an immutable image tag (`github.sha`) or digest—not `:latest` (EC2 study bootstrap may keep `latest` until that migration).
+- Design: [superpowers/specs/2026-08-02-ci-cd-ec2-design.md](superpowers/specs/2026-08-02-ci-cd-ec2-design.md).
+
+### Phase 3 — Cache and Messaging
 
 - **Redis:** Cache Aside for GET task by id.
 - **RabbitMQ:** Events (e.g. TaskCreated, TaskCompleted).
 - **NotificationLog:** Repository, persistence, and use in event processing.
-
-### Phase 3 — CI/CD
-
-- **GitHub Actions:** CI/CD pipeline.
-- Build and publish Docker image.
 
 ---
 
@@ -194,11 +197,14 @@ The system must be simple in domain complexity but architecturally mature.
 - Define MongoDB repositories and indexes (UserId, UserId + DueDate) early in Phase 1.
 - JWT is manual; **`ExpiresIn`** must match the signing configuration (same lifetime as the `exp` claim) so clients are not misled.
 - **Refresh tokens / revocation:** not in Phase 1; a future version may add refresh flows and storage—extend the API additively (e.g. optional `refresh_token` field) so existing clients keep working.
+- **AWS cost:** keep Phase 2 study infra minimal (no NAT/ALB/DocumentDB); always `terraform destroy` when not in use. Mongo on EC2 is for learning only, not a production HA pattern.
 
 ---
 
 ## 13. Document History
 
+- **2026-08-10:** Phase 2 Terraform hardening: assume `terraform-deploy-role` + S3 remote state with `use_lockfile` (plan Task 3; former ECR/compute tasks renumbered).
+- **2026-08-02:** Swapped former Phase 2 (Cache/Messaging) and Phase 3 (CI/CD). Phase 2 is now CI/CD with ECR + EC2 + Terraform; Cache/Messaging becomes Phase 3. See CI/CD design spec.
 - Phase 1 Docker stack and healthchecks aligned with repo (`docker-compose.yml`, `docker-compose.override.yml`, API `Dockerfile`); see Engineering Guidelines “Docker and Environment”.
 - Initial specification based on TaskFlow project plan and approved scope refinements (phases, PageSize 20, health checks, validation in Application layer).
 - Added MediatR, CQRS (Commands/Queries), and FluentValidation to architecture and Phase 1 stack.

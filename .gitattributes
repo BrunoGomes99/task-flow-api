@@ -1,0 +1,2 @@
+# Cloud-init user-data must keep Unix line endings on Windows checkouts.
+infra/templates/*.tpl text eol=lf

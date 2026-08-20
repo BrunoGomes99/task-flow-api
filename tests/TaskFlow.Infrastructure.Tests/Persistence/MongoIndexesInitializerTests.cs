@@ -1,19 +1,26 @@
-using Mongo2Go;
 using MongoDB.Driver;
 using TaskFlow.Infrastructure.Configuration;
 using TaskFlow.Infrastructure.Persistence;
+using TaskFlow.Infrastructure.Tests.Support;
 
 namespace TaskFlow.Infrastructure.Tests.Persistence;
 
+[Collection(MongoDbContainerFixture.CollectionName)]
 public sealed class MongoIndexesInitializerTests
 {
+    private readonly MongoDbContainerFixture _mongoDb;
+
+    public MongoIndexesInitializerTests(MongoDbContainerFixture mongoDb)
+    {
+        _mongoDb = mongoDb;
+    }
+
     [Fact]
     public async System.Threading.Tasks.Task InitializeAsync_ShouldCreateUserAndTaskIndexes()
     {
-        using var runner = MongoDbRunner.Start();
         var settings = new MongoDbSettings
         {
-            ConnectionString = runner.ConnectionString,
+            ConnectionString = _mongoDb.ConnectionString,
             DatabaseName = $"taskflow-indexes-{Guid.NewGuid():N}"
         };
 

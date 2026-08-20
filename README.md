@@ -7,7 +7,8 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 - **User** — Register, login (JWT), get profile
 - **Tasks** — Full CRUD, paginated list (filters: title, description, status; sort by due date)
 - **Auth** — JWT (no ASP.NET Identity), BCrypt password hashing, multi-tenancy via `UserId` from token
-- **Planned** — Redis cache (Cache Aside), RabbitMQ events, GitHub Actions CI/CD
+- **Phase 2 (in progress)** — GitHub Actions CI + ECR publish behind Environment `production`; Terraform AWS study stack (ECR + EC2 + Docker Compose)
+- **Planned (Phase 3)** — Redis cache (Cache Aside), RabbitMQ events, NotificationLog persistence
 
 ## Tech Stack
 
@@ -60,8 +61,27 @@ Starts the API and MongoDB. Health check: `GET /health`.
 ### Run tests
 
 ```bash
-dotnet test
+dotnet test TaskFlow.slnx
 ```
+
+Infrastructure tests use [Testcontainers](https://dotnet.testcontainers.org/) (`mongo:8.0`) and require **Docker** running locally (same requirement as GitHub Actions runners).
+
+### Continuous Integration / Delivery
+
+GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs a **single pipeline**:
+
+1. **CI** — on pushes to `main` / `dev` and on pull requests to `main`: restore, build, test.
+2. **Publish to ECR** — only after CI succeeds on push to `main` (or `workflow_dispatch`), paused on the GitHub Environment **`production`** until someone clicks Approve. Uses OIDC (no long-lived AWS keys in YAML). Tags: `github.sha` and `latest`.
+
+Local equivalent of the CI job:
+
+```bash
+dotnet restore TaskFlow.slnx
+dotnet build TaskFlow.slnx --no-restore -c Release
+dotnet test TaskFlow.slnx --no-build -c Release
+```
+
+AWS apply/destroy, OIDC variables, and EC2 notes: [infra/README.md](infra/README.md). Cache/Messaging remains **Phase 3**.
 
 ## Project Structure
 
@@ -81,7 +101,7 @@ src/
     Interfaces/              # ITaskRepository, IUserRepository, etc.
     Behaviors/               # ValidationBehavior (FluentValidation pipeline)
     Extensions/              # AddApplicationValidation, DI registration
-  TaskFlow.Infrastructure/   # MongoDB, JWT, (Redis, RabbitMQ in Phase 2)
+  TaskFlow.Infrastructure/   # MongoDB, JWT, (Redis, RabbitMQ in Phase 3)
   TaskFlow.Api/              # Controllers, middleware, configuration
 tests/
   TaskFlow.Domain.Tests/
@@ -97,3 +117,7 @@ tests/
 
 - [Project Specification](docs/PROJECT_SPEC.md) — Scope, domain, auth, API contract, phased plan  
 - [Engineering Guidelines](docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
+- [CI/CD + EC2 design](docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md) — Approved Phase 2 design (CI first; ECR + EC2 CD scaffold)  
+- [CI/CD implementation plan](docs/superpowers/plans/2026-08-02-ci-cd-implementation.md) — Task breakdown for branch `feature/ci-cd-implementation`  
+- [Infrastructure (Terraform)](infra/README.md) — Auth, S3 state, apply/destroy, ECR publish gate, ECS evolution notes  
+

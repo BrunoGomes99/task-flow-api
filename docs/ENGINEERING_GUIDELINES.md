@@ -101,7 +101,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Infrastructure Layer
 
-- [x] **MongoDB** — Separate collections for Users, Tasks; NotificationLog collection optional in Phase 1 (can be added in Phase 2).
+- [x] **MongoDB** — Separate collections for Users, Tasks; NotificationLog collection optional in Phase 1 (can be added in Phase 3 — Cache and Messaging).
 - [x] **Repositories** — UserRepository and TaskRepository implement Application interfaces; use official MongoDB driver or agreed abstraction.
 - [x] **Indexes** — Index on UserId for Tasks; compound index (UserId + DueDate) for Tasks; index on UserId (or Email for login) for Users as needed.
 - [x] **JWT** — `JwtService` issues JWT access tokens with UserId in `sub` and returns `ExpiresInSeconds`; no ASP.NET Identity.
@@ -137,7 +137,35 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ---
 
-## Phase 2 — Cache and Messaging
+## Phase 2 — CI/CD
+
+> **Order change (2026-08-02):** CI/CD was moved ahead of Cache/Messaging so the pipeline can run before Redis/RabbitMQ. Design: [superpowers/specs/2026-08-02-ci-cd-ec2-design.md](superpowers/specs/2026-08-02-ci-cd-ec2-design.md). Plan: [superpowers/plans/2026-08-02-ci-cd-implementation.md](superpowers/plans/2026-08-02-ci-cd-implementation.md). Branch: `feature/ci-cd-implementation`.
+
+### GitHub Actions
+
+- [x] **CI workflow** — On push/PR: restore, build, run tests; fail if build or tests fail.
+- [x] **No secrets in workflows** — Use GitHub secrets/variables or Environment for credentials; no hardcoded secrets (OIDC for ECR publish).
+- [x] **CD / Publish (optional)** — Same workflow as CI: after green CI on `main`, Environment `production` approval gate, then build/push to ECR (`workflow_dispatch` as escape hatch).
+- [x] **Docker image** — Image is built from the same Dockerfile used locally (`src/TaskFlow.Api/Dockerfile`); tagged with commit SHA and `latest`.
+
+### AWS CD scaffold (study / low cost)
+
+- [x] **Terraform under `infra/`** — Modules for network (VPC + public subnet, no NAT), ECR, and EC2 compute.
+- [x] **Assume role** — AWS provider assumes operator-owned `terraform-deploy-role` via `terraform_deploy_role_arn` (tfvars; not committed with real account secrets).
+- [x] **Remote state (S3 only)** — Backend with `encrypt` + `use_lockfile` (no DynamoDB); bucket bootstrapped outside the stack; `backend.hcl` gitignored.
+- [x] **EC2 + Docker Compose** — Single small instance runs API (ECR image) + MongoDB on the same host; Mongo not exposed publicly.
+- [x] **IAM instance profile** — EC2 can pull from ECR; no long-lived keys baked into the image.
+- [x] **Destroyable environment** — Documented `terraform destroy` / cost notes in `infra/README.md`.
+- [x] **ECS evolution (docs only)** — Same ECR image; future Fargate + ALB; Mongo off-box — no ECS resources required in this phase. When ECS lands, pin runtime to immutable `github.sha` (or digest), not `:latest` (EC2 bootstrap may keep `latest` until then).
+
+### Documentation and Hygiene
+
+- [x] **README** — How to build, run tests, run with Docker; link to PROJECT_SPEC.md, this file, Phase 2 CI/CD design/plan, and `infra/README.md`.
+- [x] **.gitignore** — Covers build outputs, user-specific files, and secrets (including local `.env`); no committed secrets or credentials.
+
+---
+
+## Phase 3 — Cache and Messaging
 
 ### Redis (Cache)
 
@@ -155,33 +183,17 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 - [ ] **Consumer in Infrastructure** — Consumer(s) that handle TaskCreated/TaskCompleted and persist NotificationLog (or trigger side effects); wiring in Infrastructure.
 - [ ] **docker-compose** — RabbitMQ service added; API and consumer configured to connect to RabbitMQ.
 
-### NotificationLog (Phase 2)
+### NotificationLog (Phase 3)
 
 - [ ] **INotificationLogRepository in Application** — Interface for persisting NotificationLog entries.
 - [ ] **Implementation in Infrastructure** — MongoDB collection for NotificationLogs; repository implementation.
 - [ ] **Consumer writes NotificationLog** — When processing TaskCreated/TaskCompleted (or equivalent), consumer (or application handler) creates NotificationLog records with TaskId, EventType, ProcessedAt.
 - [ ] **Indexes** — Index on TaskId and/or ProcessedAt if needed for queries.
 
-### Testing (Phase 2)
+### Testing (Phase 3)
 
 - [ ] **Cache and messaging mocked in unit tests** — New use-case tests still mock cache and publisher; no real Redis/RabbitMQ in unit tests.
 - [ ] **Integration tests (optional)** — If you add integration tests for cache or messaging, they are clearly separated from unit tests and optional for local runs.
-
----
-
-## Phase 3 — CI/CD
-
-### GitHub Actions
-
-- [ ] **CI workflow** — On push/PR: restore, build, run tests; fail if build or tests fail.
-- [ ] **No secrets in workflows** — Use GitHub secrets or environment for any credentials; no hardcoded secrets.
-- [ ] **CD / Publish (optional)** — Workflow or separate workflow to build Docker image and push to a registry (e.g. GitHub Container Registry or Docker Hub); trigger on tag or main branch as agreed.
-- [ ] **Docker image** — Image is built from the same Dockerfile used locally; tagged with commit SHA or version.
-
-### Documentation and Hygiene
-
-- [ ] **README** — How to build, run tests, run with Docker; link to PROJECT_SPEC.md and this file.
-- [x] **.gitignore** — Covers build outputs, user-specific files, and secrets (including local `.env`); no committed secrets or credentials.
 
 ---
 
@@ -191,7 +203,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 |---------|-----------------------------|-----------------------|
 | All     | Cross-Phase Standards       | Every PR / milestone  |
 | Phase 1 | MVP                         | First release         |
-| Phase 2 | Cache and Messaging         | Redis, RabbitMQ, NotificationLog |
-| Phase 3 | CI/CD                       | GitHub Actions, Docker publish   |
+| Phase 2 | CI/CD                       | GitHub Actions, ECR, Terraform/EC2 |
+| Phase 3 | Cache and Messaging         | Redis, RabbitMQ, NotificationLog |
 
 Mark items with `[x]` when done (e.g. `- [x] Domain has zero project references`). Re-check Cross-Phase Standards when adding new code in Phase 2 and Phase 3.

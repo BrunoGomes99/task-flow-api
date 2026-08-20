@@ -1,22 +1,29 @@
-using Mongo2Go;
 using TaskFlow.Application.Enums;
 using TaskFlow.Infrastructure.Configuration;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
+using TaskFlow.Infrastructure.Tests.Support;
 using DomainTask = TaskFlow.Domain.Entities.Task;
 using DomainTaskStatus = TaskFlow.Domain.Enums.TaskStatus;
 
 namespace TaskFlow.Infrastructure.Tests.Repositories;
 
+[Collection(MongoDbContainerFixture.CollectionName)]
 public sealed class TaskRepositoryTests
 {
+    private readonly MongoDbContainerFixture _mongoDb;
+
+    public TaskRepositoryTests(MongoDbContainerFixture mongoDb)
+    {
+        _mongoDb = mongoDb;
+    }
+
     [Fact]
     public async System.Threading.Tasks.Task GetPagedAsync_ShouldFilterOrderAndPaginateWithinUserScope()
     {
-        using var runner = MongoDbRunner.Start();
         var settings = new MongoDbSettings
         {
-            ConnectionString = runner.ConnectionString,
+            ConnectionString = _mongoDb.ConnectionString,
             DatabaseName = $"taskflow-tasks-{Guid.NewGuid():N}"
         };
 
@@ -51,10 +58,9 @@ public sealed class TaskRepositoryTests
     [Fact]
     public async System.Threading.Tasks.Task DeleteAsync_ShouldRemoveOnlyOwnedTask()
     {
-        using var runner = MongoDbRunner.Start();
         var settings = new MongoDbSettings
         {
-            ConnectionString = runner.ConnectionString,
+            ConnectionString = _mongoDb.ConnectionString,
             DatabaseName = $"taskflow-delete-{Guid.NewGuid():N}"
         };
 
