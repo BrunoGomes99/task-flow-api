@@ -120,6 +120,8 @@ terraform validate
 
 User-data pulls `${ecr_repository_url}:${api_image_tag}` (default tag `latest`).
 
+CI already publishes an immutable `github.sha` tag alongside `latest`. Using `latest` on the EC2 host is a deliberate study simplification until ECS (see [Future evolution: ECS](#future-evolution-ecs)).
+
 Recommended order:
 
 1. `terraform apply` (creates ECR + EC2).
@@ -171,6 +173,17 @@ Keep building the **same** API image into ECR. Later:
 - Replace the EC2 Compose host with an ECS task definition + **Fargate** service behind an **ALB**.
 - Move MongoDB off the app host to a managed store (or a dedicated data host).
 - Wire the GitHub `production` gate to an ECS service update instead of (or in addition to) image push.
+
+### Image tags: keep `latest` on EC2 for now; pin immutably on ECS
+
+**Current (EC2 Compose scaffold):** publish already pushes both `github.sha` and `latest`. The host bootstrap uses `api_image_tag` defaulting to **`latest`** for a simple first boot. That is intentional for this study stack — there is no automated redeploy yet, so tightening the runtime tag alone would not deliver production-style rollback.
+
+**Future (ECS):** the running task/service **must** reference an **immutable** image identity:
+
+- Prefer the commit tag (`:<github.sha>`) or an image **digest** (`@sha256:...`).
+- Do **not** rely on `:latest` as the source of truth for what is running in the environment.
+- Rollback = redeploy the previous task-definition revision / previous SHA (or digest), not “whatever latest points to now”.
+- `:latest` may remain as an optional convenience tag in ECR; the ECS deploy path should ignore it for promotion.
 
 No ECS resources are required in this phase.
 

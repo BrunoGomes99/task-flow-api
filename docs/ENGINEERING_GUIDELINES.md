@@ -156,7 +156,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 - [x] **EC2 + Docker Compose** — Single small instance runs API (ECR image) + MongoDB on the same host; Mongo not exposed publicly.
 - [x] **IAM instance profile** — EC2 can pull from ECR; no long-lived keys baked into the image.
 - [x] **Destroyable environment** — Documented `terraform destroy` / cost notes in `infra/README.md`.
-- [x] **ECS evolution (docs only)** — Same ECR image; future Fargate + ALB; Mongo off-box — no ECS resources required in this phase.
+- [x] **ECS evolution (docs only)** — Same ECR image; future Fargate + ALB; Mongo off-box — no ECS resources required in this phase. When ECS lands, pin runtime to immutable `github.sha` (or digest), not `:latest` (EC2 bootstrap may keep `latest` until then).
 
 ### Documentation and Hygiene
 

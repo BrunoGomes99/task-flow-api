@@ -77,6 +77,7 @@ Documented only in this cycle:
 - Keep building the **same** API image into ECR  
 - Later: ECS task definition + Fargate service + ALB  
 - Move Mongo off the EC2 host to a managed store when adopting ECS  
+- **Image identity (deferred decision):** this EC2 cycle may keep runtime on `:latest` for simple bootstrap; CI already publishes an immutable `github.sha` tag. When adopting ECS, the task/service **must** pin that SHA (or an image digest)—not `:latest`—so rollbacks and “what is running?” are explicit. `:latest` may stay as an optional ECR convenience tag only. 
 
 ### D9 — Terraform auth + remote state (study hardening)
 

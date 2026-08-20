@@ -456,7 +456,7 @@ Follow-up commit: normalize user-data to LF on Windows checkouts.
 - `terraform init -backend-config=backend.hcl` / `plan` / `apply` / `destroy` examples
 - Required variables (`terraform_deploy_role_arn`, `jwt_secret`, etc.) via `TF_VAR_` or `terraform.tfvars` (**gitignored**)
 - Reminder to destroy when idle
-- Future ECS evolution paragraph (same ECR image → Fargate + ALB; Mongo off-box)
+- Future ECS evolution paragraph (same ECR image → Fargate + ALB; Mongo off-box; **pin runtime to `github.sha` or digest, not `:latest`**)
 - GitHub OIDC variables + Environment `production` setup
 
 - [x] **Step 2: Add publish job to CI workflow (format A)**
