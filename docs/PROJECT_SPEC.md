@@ -180,8 +180,8 @@ The system must be simple in domain complexity but architecturally mature.
 
 - **GitHub Actions:** CI on push/PR (restore, build, test).
 - **Container publish:** build the existing API Dockerfile and push to **Amazon ECR** (optional CD workflow).
-- **AWS study environment (low cost):** Terraform under `infra/` for VPC (public subnet, no NAT), ECR, and a small **EC2** host running Docker Compose (**API + Mongo on the same instance**). Environment must be easy to destroy when idle.
-- **Future (documented only):** evolve the same ECR image to **ECS** (Fargate + ALB); move Mongo off the EC2 host.
+- **AWS study environment (low cost):** Terraform under `infra/` for VPC (public subnet, no NAT), ECR, and a small **EC2** host running Docker Compose (**API + Mongo on the same instance**). Provider assumes IAM role `terraform-deploy-role`; remote state on **S3** with `use_lockfile` (no DynamoDB). Environment must be easy to destroy when idle.
+- **Future (documented only):** evolve the same ECR image to **ECS** (Fargate + ALB); move Mongo off the EC2 host. On ECS, pin the running task to an immutable image tag (`github.sha`) or digest—not `:latest` (EC2 study bootstrap may keep `latest` until that migration).
 - Design: [superpowers/specs/2026-08-02-ci-cd-ec2-design.md](superpowers/specs/2026-08-02-ci-cd-ec2-design.md).
 
 ### Phase 3 — Cache and Messaging
@@ -203,6 +203,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 ## 13. Document History
 
+- **2026-08-10:** Phase 2 Terraform hardening: assume `terraform-deploy-role` + S3 remote state with `use_lockfile` (plan Task 3; former ECR/compute tasks renumbered).
 - **2026-08-02:** Swapped former Phase 2 (Cache/Messaging) and Phase 3 (CI/CD). Phase 2 is now CI/CD with ECR + EC2 + Terraform; Cache/Messaging becomes Phase 3. See CI/CD design spec.
 - Phase 1 Docker stack and healthchecks aligned with repo (`docker-compose.yml`, `docker-compose.override.yml`, API `Dockerfile`); see Engineering Guidelines “Docker and Environment”.
 - Initial specification based on TaskFlow project plan and approved scope refinements (phases, PageSize 20, health checks, validation in Application layer).

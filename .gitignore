@@ -39,6 +39,17 @@ ScaffoldingReadMe.txt
 # Local Docker / secrets
 .env
 
+# Terraform
+terraform.tfvars
+*.tfvars
+!*.tfvars.example
+backend.hcl
+.terraform/
+*.tfstate
+*.tfstate.backup
+crash.log
+crash.*.log
+
 # Others
 ~$*
 *~
@@ -59,3 +70,6 @@ CodeCoverage/
 *.VisualState.xml
 TestResult.xml
 nunit-*.xml
+# Agent / SDD scratch
+.superpowers/
+

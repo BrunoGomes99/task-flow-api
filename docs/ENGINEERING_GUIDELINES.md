@@ -143,22 +143,24 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### GitHub Actions
 
-- [ ] **CI workflow** — On push/PR: restore, build, run tests; fail if build or tests fail.
-- [ ] **No secrets in workflows** — Use GitHub secrets or environment for any credentials; no hardcoded secrets.
-- [ ] **CD / Publish (optional)** — Workflow or separate workflow to build Docker image and push to Amazon ECR; trigger on `workflow_dispatch` and/or tag as agreed.
-- [ ] **Docker image** — Image is built from the same Dockerfile used locally; tagged with commit SHA or version.
+- [x] **CI workflow** — On push/PR: restore, build, run tests; fail if build or tests fail.
+- [x] **No secrets in workflows** — Use GitHub secrets/variables or Environment for credentials; no hardcoded secrets (OIDC for ECR publish).
+- [x] **CD / Publish (optional)** — Same workflow as CI: after green CI on `main`, Environment `production` approval gate, then build/push to ECR (`workflow_dispatch` as escape hatch).
+- [x] **Docker image** — Image is built from the same Dockerfile used locally (`src/TaskFlow.Api/Dockerfile`); tagged with commit SHA and `latest`.
 
 ### AWS CD scaffold (study / low cost)
 
-- [ ] **Terraform under `infra/`** — Modules for network (VPC + public subnet, no NAT), ECR, and EC2 compute.
-- [ ] **EC2 + Docker Compose** — Single small instance runs API (ECR image) + MongoDB on the same host; Mongo not exposed publicly.
-- [ ] **IAM instance profile** — EC2 can pull from ECR; no long-lived keys baked into the image.
-- [ ] **Destroyable environment** — Documented `terraform destroy` / cost notes in `infra/README.md`.
-- [ ] **ECS evolution (docs only)** — Same ECR image; future Fargate + ALB; Mongo off-box — no ECS resources required in this phase.
+- [x] **Terraform under `infra/`** — Modules for network (VPC + public subnet, no NAT), ECR, and EC2 compute.
+- [x] **Assume role** — AWS provider assumes operator-owned `terraform-deploy-role` via `terraform_deploy_role_arn` (tfvars; not committed with real account secrets).
+- [x] **Remote state (S3 only)** — Backend with `encrypt` + `use_lockfile` (no DynamoDB); bucket bootstrapped outside the stack; `backend.hcl` gitignored.
+- [x] **EC2 + Docker Compose** — Single small instance runs API (ECR image) + MongoDB on the same host; Mongo not exposed publicly.
+- [x] **IAM instance profile** — EC2 can pull from ECR; no long-lived keys baked into the image.
+- [x] **Destroyable environment** — Documented `terraform destroy` / cost notes in `infra/README.md`.
+- [x] **ECS evolution (docs only)** — Same ECR image; future Fargate + ALB; Mongo off-box — no ECS resources required in this phase. When ECS lands, pin runtime to immutable `github.sha` (or digest), not `:latest` (EC2 bootstrap may keep `latest` until then).
 
 ### Documentation and Hygiene
 
-- [ ] **README** — How to build, run tests, run with Docker; link to PROJECT_SPEC.md, this file, and Phase 2 CI/CD design/plan.
+- [x] **README** — How to build, run tests, run with Docker; link to PROJECT_SPEC.md, this file, Phase 2 CI/CD design/plan, and `infra/README.md`.
 - [x] **.gitignore** — Covers build outputs, user-specific files, and secrets (including local `.env`); no committed secrets or credentials.
 
 ---
