@@ -65,6 +65,7 @@ resource "aws_instance" "this" {
   }
 
   tags = {
-    Name = "${var.name_prefix}-api"
+    Name             = "${var.name_prefix}-api"
+    TaskFlowRedeploy = "enabled"
   }
 }

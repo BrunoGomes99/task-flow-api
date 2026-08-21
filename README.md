@@ -72,6 +72,7 @@ GitHub Actions ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) runs a *
 
 1. **CI** — on pushes to `main` / `dev` and on pull requests to `main`: restore, build, test.
 2. **Publish to ECR** — only after CI succeeds on push to `main` (or `workflow_dispatch`), paused on the GitHub Environment **`production`** until someone clicks Approve. Uses OIDC (no long-lived AWS keys in YAML). Tags: `github.sha` and `latest`.
+3. **Redeploy on EC2 (temporary)** — SSM Run Command pins Compose to `github.sha` and runs `docker compose pull/up`. Replaced later by ECS `update-service` (see [infra/README.md](infra/README.md)).
 
 Local equivalent of the CI job:
 

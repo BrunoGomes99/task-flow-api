@@ -40,7 +40,7 @@ This cycle delivers:
 - Implement `.github/workflows/ci.yml` so every push/PR validates the solution.  
 - Author Terraform under `infra/` and CD docs; **do not require** `terraform apply` to close the phase.  
 - **CD (adopted):** single pipeline on `main` — after CI succeeds, GitHub Environment **`production`** required-reviewer gate, then build/push the API image to ECR via OIDC. `workflow_dispatch` remains an escape hatch to re-publish without a new commit.  
-- Publish means **image promotion to ECR** in this cycle; the EC2 Compose host does not auto-redeploy (documented separately; ECS is the future path).
+- **EC2 redeploy (temporary, Task 7):** after publish, **SSM Run Command** updates Compose on the instance and pins `API_IMAGE` to **`github.sha`**. Replace with ECS `update-service` later; do not treat SSM+Compose as the long-term CD model.
 
 ### D4 — Compute: EC2 + Docker (not App Runner)
 
@@ -77,7 +77,8 @@ Documented only in this cycle:
 - Keep building the **same** API image into ECR  
 - Later: ECS task definition + Fargate service + ALB  
 - Move Mongo off the EC2 host to a managed store when adopting ECS  
-- **Image identity (deferred decision):** this EC2 cycle may keep runtime on `:latest` for simple bootstrap; CI already publishes an immutable `github.sha` tag. When adopting ECS, the task/service **must** pin that SHA (or an image digest)—not `:latest`—so rollbacks and “what is running?” are explicit. `:latest` may stay as an optional ECR convenience tag only. 
+- **Remove** the temporary SSM Compose redeploy path (GitHub job + `AmazonSSMManagedInstanceCore` / `TaskFlowRedeploy` tag) when ECS lands  
+- **Image identity:** bootstrap may still use `:latest` on first EC2 boot; SSM redeploy and future ECS **must** pin `github.sha` (or digest)—not `:latest`—as the running identity. `:latest` may stay as an optional ECR convenience tag only. 
 
 ### D9 — Terraform auth + remote state (study hardening)
 
@@ -105,9 +106,13 @@ Developer → GitHub (PR/push)
      (OIDC; tags: sha + latest)
               │
               ▼
-     EC2 (user-data on boot)
-       docker compose up
-         ├─ taskflow.api  (ECR image)
+     SSM Run Command (temporary)
+     pin API_IMAGE=...:sha
+     compose pull && up -d
+              │
+              ▼
+     EC2 (Compose runtime)
+         ├─ taskflow.api  (ECR image @ sha)
          └─ mongo         (local volume)
 ```
 
@@ -160,7 +165,7 @@ docs/superpowers/plans/
 | `backend.tf` | S3 remote state + `use_lockfile` (no DynamoDB) |
 | `compose/docker-compose.aws.yml` | API + Mongo on host |
 | `infra/README.md` | apply/destroy, auth/backend bootstrap, cost notes, SSH guidance, OIDC publish, ECS notes |
-| `.github/workflows/ci.yml` | CI + Environment `production` gate → ECR push (OIDC) |
+| `.github/workflows/ci.yml` | CI + Environment `production` gate → ECR push (OIDC) + SSM redeploy (temporary) |
 
 **Outputs (examples):** ECR repository URL, public IP / DNS, suggested health URL (`http://<ip>:8080/health`).
 
@@ -173,6 +178,7 @@ docs/superpowers/plans/
 - [x] Provider assumes `terraform-deploy-role`; state uses S3 + `use_lockfile` (examples committed, secrets/tfvars/backend.hcl gitignored)  
 - [x] Operator can apply and destroy without leftover billable resources (documented checklist)  
 - [x] Single CI/CD workflow: publish to ECR after Environment `production` approval (OIDC; no static keys)
+- [x] Temporary SSM redeploy pins EC2 Compose to `github.sha` (documented as pre-ECS bridge)
 
 ## Out of scope reminders
 
