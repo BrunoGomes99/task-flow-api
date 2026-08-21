@@ -1,17 +1,22 @@
-# Single pipeline (format A): CI on every PR/push; ECR publish only after
-# the GitHub Environment "production" approval gate on main (or manual dispatch).
+# Single pipeline (format A): CI on every PR/push; ECR publish + EC2 Compose
+# redeploy only after the GitHub Environment "production" approval gate on main
+# (or manual dispatch).
 #
-# Auth for publish: GitHub OIDC → IAM role (no long-lived AWS keys in the workflow).
+# Auth: GitHub OIDC → IAM role (no long-lived AWS keys in the workflow).
 # Configure repo Variables (Settings → Secrets and variables → Actions → Variables):
 #   AWS_REGION          e.g. us-east-1
-#   AWS_ROLE_TO_ASSUME  ARN of a role trustable by GitHub OIDC (ECR push permissions)
+#   AWS_ROLE_TO_ASSUME  ARN of a role trustable by GitHub OIDC
+#                       (ECR push + ssm:SendCommand / GetCommandInvocation + ec2:DescribeInstances)
 #   ECR_REPOSITORY      e.g. taskflow-api
+# Optional:
+#   NAME_PREFIX         default taskflow (must match Terraform name_prefix; tags Name=<prefix>-api)
+#   EC2_INSTANCE_ID     pin a specific instance instead of discovering by tag TaskFlowRedeploy=enabled
 #
-# Also create Environment "production" with required reviewers so the publish job waits
-# for a manual Approve click (workplace-style promotion gate).
+# Also create Environment "production" with required reviewers so publish waits for Approve.
 #
-# Scope of "deploy" in this phase: build + push image to ECR. The EC2 host does not
-# auto-redeploy; see infra/README.md for pull/up after publish.
+# Temporary until ECS: after push, SSM Run Command updates /opt/taskflow/.env with
+# API_IMAGE=...:<github.sha>, then docker compose pull && up -d. Replace with ECS
+# update-service when migrating off EC2 Compose.
 
 name: CI
 
@@ -64,6 +69,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      image_tag: ${{ github.sha }}
+      registry: ${{ steps.ecr-login.outputs.registry }}
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
@@ -91,3 +99,102 @@ jobs:
           docker push "${IMAGE_URI}:${IMAGE_TAG}"
           docker push "${IMAGE_URI}:latest"
           echo "Pushed ${IMAGE_URI}:${IMAGE_TAG} and ${IMAGE_URI}:latest"
+
+  # Temporary bridge until ECS: pin Compose to github.sha via SSM (not :latest).
+  redeploy-ec2:
+    name: Redeploy Compose on EC2 (SSM)
+    needs: publish-ecr
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      NAME_PREFIX: ${{ vars.NAME_PREFIX }}
+      IMAGE_TAG: ${{ needs.publish-ecr.outputs.image_tag }}
+      REGISTRY: ${{ needs.publish-ecr.outputs.registry }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: SSM Run Command — pull and up pinned SHA
+        run: |
+          set -euo pipefail
+          NAME_PREFIX="${NAME_PREFIX:-taskflow}"
+
+          if [ -n "${{ vars.EC2_INSTANCE_ID }}" ]; then
+            INSTANCE_ID="${{ vars.EC2_INSTANCE_ID }}"
+          else
+            INSTANCE_ID="$(aws ec2 describe-instances \
+              --filters \
+                "Name=tag:TaskFlowRedeploy,Values=enabled" \
+                "Name=tag:Name,Values=${NAME_PREFIX}-api" \
+                "Name=instance-state-name,Values=running" \
+              --query 'Reservations[0].Instances[0].InstanceId' \
+              --output text)"
+          fi
+
+          if [ -z "${INSTANCE_ID}" ] || [ "${INSTANCE_ID}" = "None" ]; then
+            echo "::error::No running EC2 instance found for SSM redeploy (tag TaskFlowRedeploy=enabled). Apply infra and wait for SSM Online."
+            exit 1
+          fi
+
+          echo "Redeploying instance ${INSTANCE_ID} to ${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+
+          REMOTE_SCRIPT=$(cat <<EOF
+          set -euo pipefail
+          cd /opt/taskflow
+          API_IMAGE_VALUE='${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}'
+          if grep -q '^API_IMAGE=' .env; then
+            sed -i "s|^API_IMAGE=.*|API_IMAGE=\${API_IMAGE_VALUE}|" .env
+          else
+            printf 'API_IMAGE=%s\n' "\${API_IMAGE_VALUE}" >> .env
+          fi
+          aws ecr get-login-password --region '${AWS_REGION}' \
+            | docker login --username AWS --password-stdin '${REGISTRY}'
+          docker compose pull taskflow.api
+          docker compose up -d
+          curl -fsS http://127.0.0.1:8080/health
+          echo "Redeploy OK: \${API_IMAGE_VALUE}"
+          EOF
+          )
+
+          # Flatten leading indent from the heredoc for SSM.
+          REMOTE_SCRIPT="$(printf '%s\n' "${REMOTE_SCRIPT}" | sed 's/^[[:space:]]*//')"
+
+          COMMAND_ID="$(aws ssm send-command \
+            --instance-ids "${INSTANCE_ID}" \
+            --document-name "AWS-RunShellScript" \
+            --comment "TaskFlow Compose redeploy ${IMAGE_TAG}" \
+            --parameters "$(jq -nc --arg s "${REMOTE_SCRIPT}" '{commands:[$s]}')" \
+            --query 'Command.CommandId' \
+            --output text)"
+
+          echo "SSM CommandId=${COMMAND_ID}"
+          aws ssm wait command-executed \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${INSTANCE_ID}"
+
+          STATUS="$(aws ssm get-command-invocation \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${INSTANCE_ID}" \
+            --query 'Status' \
+            --output text)"
+
+          aws ssm get-command-invocation \
+            --command-id "${COMMAND_ID}" \
+            --instance-id "${INSTANCE_ID}" \
+            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
+            --output json
+
+          if [ "${STATUS}" != "Success" ]; then
+            echo "::error::SSM redeploy failed with status ${STATUS}"
+            exit 1
+          fi
