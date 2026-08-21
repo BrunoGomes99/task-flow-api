@@ -8,7 +8,7 @@ Terraform scaffold for a **low-cost, destroyable** AWS study environment:
 | `modules/ecr` | ECR repository for the API image (`taskflow-api` by default) |
 | `modules/compute` | EC2 (Amazon Linux 2023), security group, IAM instance profile, user-data |
 
-On first boot, user-data installs Docker + Compose, writes `infra/compose/docker-compose.aws.yml` and a `.env` under `/opt/taskflow`, authenticates to ECR, and runs **API + MongoDB** on the same host. MongoDB port **27017 is not** opened on the security group.
+On first boot, user-data installs Docker from Amazon Linux 2023 repos and the Compose V2 CLI plugin from the official GitHub release (AL2023 does not package `docker-compose-plugin`), writes `infra/compose/docker-compose.aws.yml` and a `.env` under `/opt/taskflow`, authenticates to ECR, and runs **API + MongoDB** on the same host. MongoDB port **27017 is not** opened on the security group.
 
 This stack is a learning scaffold. **Do not treat it as production HA.** Prefer `terraform destroy` when idle.
 
