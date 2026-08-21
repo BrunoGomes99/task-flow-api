@@ -179,9 +179,9 @@ The system must be simple in domain complexity but architecturally mature.
 ### Phase 2 — CI/CD
 
 - **GitHub Actions:** CI on push/PR (restore, build, test).
-- **Container publish:** build the existing API Dockerfile and push to **Amazon ECR** (optional CD workflow).
+- **Container publish:** build the existing API Dockerfile and push to **Amazon ECR**; after Approve, temporary **SSM** redeploy on EC2 pins Compose to `github.sha`.
 - **AWS study environment (low cost):** Terraform under `infra/` for VPC (public subnet, no NAT), ECR, and a small **EC2** host running Docker Compose (**API + Mongo on the same instance**). Provider assumes IAM role `terraform-deploy-role`; remote state on **S3** with `use_lockfile` (no DynamoDB). Environment must be easy to destroy when idle.
-- **Future (documented only):** evolve the same ECR image to **ECS** (Fargate + ALB); move Mongo off the EC2 host. On ECS, pin the running task to an immutable image tag (`github.sha`) or digest—not `:latest` (EC2 study bootstrap may keep `latest` until that migration).
+- **Future (documented only):** evolve the same ECR image to **ECS** (Fargate + ALB); move Mongo off the EC2 host; **remove** SSM Compose redeploy. On ECS, pin the running task to an immutable image tag (`github.sha`) or digest—not `:latest`.
 - Design: [superpowers/specs/2026-08-02-ci-cd-ec2-design.md](superpowers/specs/2026-08-02-ci-cd-ec2-design.md).
 
 ### Phase 3 — Cache and Messaging

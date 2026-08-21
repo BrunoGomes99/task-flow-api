@@ -120,7 +120,7 @@ terraform validate
 
 User-data pulls `${ecr_repository_url}:${api_image_tag}` (default tag `latest`).
 
-CI already publishes an immutable `github.sha` tag alongside `latest`. Using `latest` on the EC2 host is a deliberate study simplification until ECS (see [Future evolution: ECS](#future-evolution-ecs)).
+CI already publishes an immutable `github.sha` tag alongside `latest`. First boot may still use `api_image_tag=latest`; subsequent GitHub deploys pin the running Compose stack to `github.sha` via SSM (temporary until ECS).
 
 Recommended order:
 
@@ -135,36 +135,72 @@ docker compose pull
 docker compose up -d
 ```
 
-Publishing a new image to ECR **does not** automatically redeploy a running EC2. That is expected in this scaffold; ECS (below) is the path toward managed rolling deploys.
+Publishing a new image to ECR is followed by a **temporary** SSM redeploy job (see below) that pins Compose to `github.sha`. When you migrate to ECS, remove that job and use `update-service` instead.
 
-## GitHub Actions → ECR publish
+## GitHub Actions → ECR publish + SSM redeploy (temporary)
 
 The workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) is a **single pipeline**:
 
 1. **CI** — restore / build / test on PRs and pushes.
 2. **Publish** — only on push to `main` (or `workflow_dispatch`), after CI succeeds, behind the GitHub Environment **`production`** (manual Approve).
-3. Build uses `src/TaskFlow.Api/Dockerfile`, tags with `github.sha` and `latest`, pushes to ECR via **OIDC** (no static AWS keys in YAML).
+3. Build uses `src/TaskFlow.Api/Dockerfile`, tags with `github.sha` and `latest`, pushes to ECR via **OIDC**.
+4. **Redeploy (temporary, pre-ECS)** — SSM Run Command on the EC2 host: set `API_IMAGE=...:<github.sha>` in `/opt/taskflow/.env`, `docker compose pull` + `up -d`, then `curl` local `/health`.
 
-### One-time GitHub setup
+User-data remains **bootstrap only**. Ongoing deploys do not rewrite user-data or replace the instance.
+
+### One-time GitHub + IAM setup
 
 1. Create Environment **`production`** (Settings → Environments) and add **Required reviewers** so the publish job waits for approval.
-2. Create an IAM role trusted by GitHub’s OIDC provider for this repository (same account as ECR, or a sibling of `terraform-deploy-role`) with ECR push permissions on `taskflow-api`.
-3. Set repository **Variables** (not committed):
+2. Create an IAM role trusted by GitHub’s OIDC provider for this repository with:
+   - ECR **push** on `taskflow-api`
+   - `ec2:DescribeInstances` (discover instance by tags)
+   - `ssm:SendCommand`, `ssm:GetCommandInvocation` on `AWS-RunShellScript` and the TaskFlow instance
+3. After `terraform apply`, wait until the instance is **SSM Online** (Systems Manager → Fleet Manager). The instance profile includes `AmazonSSMManagedInstanceCore` and tag `TaskFlowRedeploy=enabled`.
+4. Set repository **Variables** (not committed):
 
-| Variable | Example |
-|----------|---------|
-| `AWS_REGION` | `us-east-1` |
-| `AWS_ROLE_TO_ASSUME` | `arn:aws:iam::ACCOUNT_ID:role/github-ecr-publish` |
-| `ECR_REPOSITORY` | `taskflow-api` |
+| Variable | Example | Required |
+|----------|---------|----------|
+| `AWS_REGION` | `us-east-1` | yes |
+| `AWS_ROLE_TO_ASSUME` | `arn:aws:iam::ACCOUNT_ID:role/github-ecr-publish` | yes |
+| `ECR_REPOSITORY` | `taskflow-api` | yes |
+| `NAME_PREFIX` | `taskflow` | no (default `taskflow`) |
+| `EC2_INSTANCE_ID` | `i-0abc...` | no (overrides tag discovery) |
 
-Until those variables and the OIDC trust exist, the CI job still runs; the publish job will fail at AWS auth — that is expected.
+Example **extra** permissions on the GitHub OIDC role (in addition to ECR push):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DescribeTaskFlowInstances",
+      "Effect": "Allow",
+      "Action": ["ec2:DescribeInstances"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SsmRunShellOnTaskFlow",
+      "Effect": "Allow",
+      "Action": [
+        "ssm:SendCommand",
+        "ssm:GetCommandInvocation",
+        "ssm:ListCommands",
+        "ssm:ListCommandInvocations"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Tighten `Resource` to your account/region/instance ARNs when you harden the lab. Until OIDC + SSM are configured, CI still runs; publish/redeploy fail at AWS auth — that is expected.
 
 ## Security reminders
 
 - Do not open MongoDB to the internet.
 - Prefer restricting `allowed_api_cidr` (and SSH) to your IP.
 - Never commit `terraform.tfvars`, `backend.hcl`, or real secrets.
-- EC2 uses an instance profile for ECR **pull** only; GitHub uses OIDC for ECR **push**.
+- EC2 instance profile: ECR **pull** + SSM agent. GitHub OIDC role: ECR **push** + SSM SendCommand.
 
 ## Future evolution: ECS
 
@@ -172,20 +208,16 @@ Keep building the **same** API image into ECR. Later:
 
 - Replace the EC2 Compose host with an ECS task definition + **Fargate** service behind an **ALB**.
 - Move MongoDB off the app host to a managed store (or a dedicated data host).
-- Wire the GitHub `production` gate to an ECS service update instead of (or in addition to) image push.
+- **Remove** the SSM redeploy job; wire the GitHub `production` gate to an ECS **`update-service`** (or new task definition) instead.
+- Drop `AmazonSSMManagedInstanceCore` / `TaskFlowRedeploy` when the EC2 host is gone.
 
-### Image tags: keep `latest` on EC2 for now; pin immutably on ECS
+### Image tags: bootstrap `latest`; redeploy and ECS pin SHA
 
-**Current (EC2 Compose scaffold):** publish already pushes both `github.sha` and `latest`. The host bootstrap uses `api_image_tag` defaulting to **`latest`** for a simple first boot. That is intentional for this study stack — there is no automated redeploy yet, so tightening the runtime tag alone would not deliver production-style rollback.
+**Bootstrap (user-data):** default `api_image_tag = latest` for a simple first boot if an image already exists.
 
-**Future (ECS):** the running task/service **must** reference an **immutable** image identity:
+**SSM redeploy (temporary):** always sets `API_IMAGE` to the immutable `github.sha` tag so the running container matches the approved commit.
 
-- Prefer the commit tag (`:<github.sha>`) or an image **digest** (`@sha256:...`).
-- Do **not** rely on `:latest` as the source of truth for what is running in the environment.
-- Rollback = redeploy the previous task-definition revision / previous SHA (or digest), not “whatever latest points to now”.
-- `:latest` may remain as an optional convenience tag in ECR; the ECS deploy path should ignore it for promotion.
-
-No ECS resources are required in this phase.
+**Future (ECS):** the running task/service **must** reference an **immutable** image identity (`:<github.sha>` or digest). Do **not** rely on `:latest` as the source of truth. Rollback = previous task-definition revision / previous SHA.
 
 ## Layout
 

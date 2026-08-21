@@ -147,6 +147,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 - [x] **No secrets in workflows** — Use GitHub secrets/variables or Environment for credentials; no hardcoded secrets (OIDC for ECR publish).
 - [x] **CD / Publish (optional)** — Same workflow as CI: after green CI on `main`, Environment `production` approval gate, then build/push to ECR (`workflow_dispatch` as escape hatch).
 - [x] **Docker image** — Image is built from the same Dockerfile used locally (`src/TaskFlow.Api/Dockerfile`); tagged with commit SHA and `latest`.
+- [x] **EC2 redeploy via SSM (temporary)** — After publish, SSM Run Command pins Compose to `github.sha` and restarts the API container; replace with ECS `update-service` later.
 
 ### AWS CD scaffold (study / low cost)
 
@@ -154,9 +155,9 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 - [x] **Assume role** — AWS provider assumes operator-owned `terraform-deploy-role` via `terraform_deploy_role_arn` (tfvars; not committed with real account secrets).
 - [x] **Remote state (S3 only)** — Backend with `encrypt` + `use_lockfile` (no DynamoDB); bucket bootstrapped outside the stack; `backend.hcl` gitignored.
 - [x] **EC2 + Docker Compose** — Single small instance runs API (ECR image) + MongoDB on the same host; Mongo not exposed publicly.
-- [x] **IAM instance profile** — EC2 can pull from ECR; no long-lived keys baked into the image.
+- [x] **IAM instance profile** — EC2 can pull from ECR and be targeted by SSM; no long-lived keys baked into the image.
 - [x] **Destroyable environment** — Documented `terraform destroy` / cost notes in `infra/README.md`.
-- [x] **ECS evolution (docs only)** — Same ECR image; future Fargate + ALB; Mongo off-box — no ECS resources required in this phase. When ECS lands, pin runtime to immutable `github.sha` (or digest), not `:latest` (EC2 bootstrap may keep `latest` until then).
+- [x] **ECS evolution (docs only)** — Same ECR image; future Fargate + ALB; Mongo off-box; remove SSM redeploy when ECS lands; pin runtime to immutable `github.sha` (or digest), not `:latest`.
 
 ### Documentation and Hygiene
 

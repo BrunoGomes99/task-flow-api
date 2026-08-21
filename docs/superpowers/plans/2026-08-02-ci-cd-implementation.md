@@ -437,7 +437,7 @@ Follow-up commit: normalize user-data to LF on Windows checkouts.
 
 ### Task 6: Infra README + CI/CD publish gate (format A)
 
-**Decision (2026-08-16):** One workflow on `main` — CI then Environment **`production`** approval → ECR push (OIDC). No separate `cd.yml`. `workflow_dispatch` kept as escape hatch. Publish = image to ECR only; EC2 does not auto-redeploy.
+**Decision (2026-08-16):** One workflow on `main` — CI then Environment **`production`** approval → ECR push (OIDC). No separate `cd.yml`. `workflow_dispatch` kept as escape hatch. Publish = image to ECR; EC2 redeploy added in Task 7 (SSM, temporary until ECS).
 
 **Files:**
 
@@ -482,7 +482,46 @@ EOF
 
 
 
-### Task 7: Verification gate (before claiming Phase 2 coding done)
+### Task 7: SSM Run Command redeploy on EC2 (temporary until ECS)
+
+**Decision (2026-08-21):** After ECR publish, redeploy Compose on the existing EC2 via **SSM Run Command** (no SSH keys in GitHub). Pin `API_IMAGE` to **`github.sha`**. Treat as a **temporary** bridge; replace with ECS `update-service` later and remove SSM redeploy + related IAM/tags.
+
+**Files:**
+
+- Modify: `infra/modules/compute/iam.tf` (`AmazonSSMManagedInstanceCore`)
+- Modify: `infra/modules/compute/main.tf` (tag `TaskFlowRedeploy=enabled`)
+- Modify: `infra/outputs.tf` (`instance_id`)
+- Modify: `.github/workflows/ci.yml` (job `redeploy-ec2`)
+- Modify: `infra/README.md`, design spec, this plan, `ENGINEERING_GUIDELINES.md`, root `README.md`
+
+- [x] **Step 1: Instance profile can be managed by SSM**
+
+Attach `AmazonSSMManagedInstanceCore` to the EC2 role. Tag the instance for discovery (`TaskFlowRedeploy=enabled`, `Name=<prefix>-api`).
+
+- [x] **Step 2: Workflow redeploy after publish**
+
+Job `redeploy-ec2` needs `publish-ecr` (same `main` / `workflow_dispatch` gate; no second Environment approval). Discover instance by tag (or `vars.EC2_INSTANCE_ID`), `ssm send-command` with `AWS-RunShellScript`: update `.env` `API_IMAGE` to `registry/repo:github.sha`, ECR login, `docker compose pull` + `up -d`, curl `/health`. Fail the job if SSM status ≠ Success.
+
+- [x] **Step 3: Document OIDC SSM permissions and ECS replacement**
+
+Document extra IAM actions on the GitHub role, SSM Online prerequisite, and that ECS removes this path.
+
+- [x] **Step 4: Commit**
+
+```bash
+git add infra/ .github/workflows/ci.yml README.md docs/
+git commit -m "$(cat <<'EOF'
+ci: redeploy EC2 Compose via SSM pinned to github.sha
+
+EOF
+)"
+```
+
+---
+
+
+
+### Task 8: Verification gate (before claiming Phase 2 coding done)
 
 - [ ] **Step 1: CI green on GitHub** for a PR from `feature/ci-cd-implementation`
 
@@ -500,9 +539,10 @@ Only after Steps 1–3: mark Phase 2 CI/CD checklist items in `ENGINEERING_GUIDE
 
 ## Execution notes
 
-- **Status:** Tasks 0–6 complete. **Next:** Task 7 (verification gate / PR).
+- **Status:** Tasks 0–7 complete. **Next:** Task 8 (verification gate / PR).
 - **Do not** `terraform apply` unless explicitly requested.
 - Prefer small commits per task above.
 - State bucket and IAM role `terraform-deploy-role` are **operator-owned prerequisites** for Task 3; the repo only wires Terraform to them.
-- GitHub Environment `production` + OIDC role/variables are **operator-owned prerequisites** for the publish job; CI still runs without them.
+- GitHub Environment `production` + OIDC role/variables are **operator-owned prerequisites** for publish + SSM redeploy; CI still runs without them.
+- SSM redeploy is **temporary** until ECS; operator must extend the OIDC role with SSM/EC2 describe permissions (see `infra/README.md`).
 
