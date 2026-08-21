@@ -28,7 +28,11 @@ var app = builder.Build();
 
 app.UseExceptionHandler();
 
-if (app.Environment.IsDevelopment())
+
+var enableSwagger = app.Environment.IsDevelopment()
+    || app.Configuration.GetValue("EnableSwagger", false);
+
+if (enableSwagger)
 {
     app.UseSwagger();
     app.UseSwaggerUI(options =>
