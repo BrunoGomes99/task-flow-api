@@ -4,7 +4,7 @@
 
 **Goal:** Add GitHub Actions CI and a low-cost AWS CD scaffold (ECR + EC2 + Docker Compose with Mongo on the same host), after documenting the Phase 2/3 swap.
 
-**Architecture:** CI validates every PR with restore/build/test. CD is Terraform under `infra/` provisioning a minimal public VPC, ECR, and one EC2 that pulls the API image and runs Compose (API + Mongo). After the network module, wire **AWS provider `assume_role`** to the operator’s `terraform-deploy-role` and an **S3 remote backend** with native lockfile (no DynamoDB). ECS is documented as a future evolution only; no `terraform apply` is required to finish the coding tasks.
+**Architecture:** CI validates every PR with restore/build/test. CD is Terraform under `infra/` provisioning a minimal public VPC, ECR, and one EC2 that pulls the API image and runs Compose (API + Mongo). After the network module, wire **AWS provider** `assume_role` to the operator’s `terraform-deploy-role` and an **S3 remote backend** with native lockfile (no DynamoDB). ECS is documented as a future evolution only; no `terraform apply` is required to finish the coding tasks.
 
 **Tech Stack:** GitHub Actions, .NET 10, Docker (existing Dockerfile), Terraform (AWS provider), Amazon S3 (remote state + `use_lockfile`), Amazon ECR, EC2 (Amazon Linux 2023), Docker Compose.
 
@@ -31,16 +31,16 @@
 ## File map
 
 
-| Path                             | Role                                                                 |
-| -------------------------------- | -------------------------------------------------------------------- |
-| `.github/workflows/ci.yml`       | CI + ECR publish behind Environment `production` (OIDC)              |
-| `infra/**`                       | Terraform modules + compose for AWS host                             |
-| `infra/backend.tf`               | S3 remote state + `use_lockfile` (no DynamoDB)                       |
-| `infra/backend.hcl.example`      | Example partial backend config (bucket/key/region)                   |
-| `infra/terraform.tfvars.example` | Example vars including `terraform_deploy_role_arn`                   |
-| `docs/ENGINEERING_GUIDELINES.md` | Phase checklists (already reordered in docs-only pass)               |
-| `docs/PROJECT_SPEC.md`           | Phased scope (already reordered in docs-only pass)                   |
-| `README.md`                      | Link CI/CD docs and branch guidance                                  |
+| Path                             | Role                                                    |
+| -------------------------------- | ------------------------------------------------------- |
+| `.github/workflows/ci.yml`       | CI + ECR publish behind Environment `production` (OIDC) |
+| `infra/**`                       | Terraform modules + compose for AWS host                |
+| `infra/backend.tf`               | S3 remote state + `use_lockfile` (no DynamoDB)          |
+| `infra/backend.hcl.example`      | Example partial backend config (bucket/key/region)      |
+| `infra/terraform.tfvars.example` | Example vars including `terraform_deploy_role_arn`      |
+| `docs/ENGINEERING_GUIDELINES.md` | Phase checklists (already reordered in docs-only pass)  |
+| `docs/PROJECT_SPEC.md`           | Phased scope (already reordered in docs-only pass)      |
+| `README.md`                      | Link CI/CD docs and branch guidance                     |
 
 
 ---
@@ -240,7 +240,7 @@ EOF
 - Consumes: pre-existing S3 bucket for state (created **outside** this stack)
 - Produces: provider sessions via assumed role; remote state config ready for `terraform init -backend-config=backend.hcl`
 
-- [x] **Step 1: Add `terraform_deploy_role_arn` and wire `assume_role`**
+- [x] **Step 1: Add** `terraform_deploy_role_arn` **and wire** `assume_role`
 
 In `infra/variables.tf`:
 
@@ -437,7 +437,7 @@ Follow-up commit: normalize user-data to LF on Windows checkouts.
 
 ### Task 6: Infra README + CI/CD publish gate (format A)
 
-**Decision (2026-08-16):** One workflow on `main` — CI then Environment **`production`** approval → ECR push (OIDC). No separate `cd.yml`. `workflow_dispatch` kept as escape hatch. Publish = image to ECR; EC2 redeploy added in Task 7 (SSM, temporary until ECS).
+**Decision (2026-08-16):** One workflow on `main` — CI then Environment `production` approval → ECR push (OIDC). No separate `cd.yml`. `workflow_dispatch` kept as escape hatch. Publish = image to ECR; EC2 redeploy added in Task 7 (SSM, temporary until ECS).
 
 **Files:**
 
@@ -456,7 +456,7 @@ Follow-up commit: normalize user-data to LF on Windows checkouts.
 - `terraform init -backend-config=backend.hcl` / `plan` / `apply` / `destroy` examples
 - Required variables (`terraform_deploy_role_arn`, `jwt_secret`, etc.) via `TF_VAR_` or `terraform.tfvars` (**gitignored**)
 - Reminder to destroy when idle
-- Future ECS evolution paragraph (same ECR image → Fargate + ALB; Mongo off-box; **pin runtime to `github.sha` or digest, not `:latest`**)
+- Future ECS evolution paragraph (same ECR image → Fargate + ALB; Mongo off-box; **pin runtime to** `github.sha` **or digest, not** `:latest`)
 - GitHub OIDC variables + Environment `production` setup
 
 - [x] **Step 2: Add publish job to CI workflow (format A)**
@@ -484,7 +484,7 @@ EOF
 
 ### Task 7: SSM Run Command redeploy on EC2 (temporary until ECS)
 
-**Decision (2026-08-21):** After ECR publish, redeploy Compose on the existing EC2 via **SSM Run Command** (no SSH keys in GitHub). Pin `API_IMAGE` to **`github.sha`**. Treat as a **temporary** bridge; replace with ECS `update-service` later and remove SSM redeploy + related IAM/tags.
+**Decision (2026-08-21):** After ECR publish, redeploy Compose on the existing EC2 via **SSM Run Command** (no SSH keys in GitHub). Pin `API_IMAGE` to `github.sha`. Treat as a **temporary** bridge; replace with ECS `update-service` later and remove SSM redeploy + related IAM/tags.
 
 **Files:**
 
@@ -523,13 +523,13 @@ EOF
 
 ### Task 8: Verification gate (before claiming Phase 2 coding done)
 
-- [ ] **Step 1: CI green on GitHub** for a PR from `feature/ci-cd-implementation`
+- [x] **Step 1: CI green on GitHub** for a PR from `feature/ci-cd-implementation`
 
-- [ ] **Step 2:** `terraform validate` **succeeds** under `infra/` (with backend/role examples in place)
+- [x] **Step 2:** `terraform validate` **succeeds** under `infra/` (with backend/role examples in place)
 
-- [ ] **Step 3: Confirm Phase 3 items untouched** (no Redis/RabbitMQ code)
+- [x] **Step 3: Confirm Phase 3 items untouched** (no Redis/RabbitMQ code)
 
-- [ ] **Step 4: Spec self-check** — every Decision D1–D9 in the design has a corresponding task or explicit “docs only” note
+- [x] **Step 4: Spec self-check** — every Decision D1–D9 in the design has a corresponding task or explicit “docs only” note
 
 Only after Steps 1–3: mark Phase 2 CI/CD checklist items in `ENGINEERING_GUIDELINES.md` and open PR.
 
