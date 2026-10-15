@@ -57,7 +57,7 @@ The API will listen on the configured port (e.g. `http://localhost:5000`).
 docker-compose up -d
 ```
 
-Starts the API, MongoDB, and Redis. Redis port `6379` is not published; the API reaches it as `redis:6379`. Health check: `GET /health`. A Redis outage does not fail get-by-id: the handler reads MongoDB.
+Starts the API, MongoDB, and Redis. Redis port `6379` is not published; the API reaches it as `redis:6379`. Health check: `GET /health`. A Redis outage does not fail get-by-id: the handler reads MongoDB. Local Compose also starts Redis Commander at `http://localhost:8083` (basic auth from `.env`) to browse cache keys. That UI is not part of the AWS Compose file.
 
 ### Run tests
 
