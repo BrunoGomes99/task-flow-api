@@ -57,6 +57,22 @@ services:
       retries: 10
       start_period: 5s
 
+  redis-commander:
+    image: ghcr.io/joeferner/redis-commander:0.9.1
+    restart: unless-stopped
+    user: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${REDIS_COMMANDER_HOST_PORT:-8083}:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: ${REDIS_COMMANDER_USER:-rediscommanderuser}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-rediscommanderpass}
+    networks:
+      - taskflow-net
+
   mongo-express:
     image: mongo-express:1.0.2-20-alpine3.19
     restart: unless-stopped

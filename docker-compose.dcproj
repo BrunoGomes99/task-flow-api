@@ -4,6 +4,8 @@
     <ProjectVersion>2.1</ProjectVersion>
     <DockerTargetOS>Linux</DockerTargetOS>
     <ProjectGuid>81dded9d-158b-e303-5f62-77a2896d2a5a</ProjectGuid>
+    <!-- Same project name as the CLI (directory name), so Visual Studio reuses task-flow-api_taskflow-db. -->
+    <DockerComposeProjectName>task-flow-api</DockerComposeProjectName>
   </PropertyGroup>
   <ItemGroup>
     <None Include="docker-compose.override.yml">
