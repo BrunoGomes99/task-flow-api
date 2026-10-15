@@ -10,10 +10,12 @@ namespace TaskFlow.Application.UseCases.Tasks.UpdateTask;
 public sealed class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand, Result>
 {
     private readonly ITaskRepository _taskRepository;
+    private readonly ITaskCacheInvalidator _taskCacheInvalidator;
 
-    public UpdateTaskCommandHandler(ITaskRepository taskRepository)
+    public UpdateTaskCommandHandler(ITaskRepository taskRepository, ITaskCacheInvalidator taskCacheInvalidator)
     {
         _taskRepository = taskRepository;
+        _taskCacheInvalidator = taskCacheInvalidator;
     }
 
     public async Task<Result> Handle(UpdateTaskCommand request, CancellationToken cancellationToken)
@@ -30,6 +32,7 @@ public sealed class UpdateTaskCommandHandler : IRequestHandler<UpdateTaskCommand
 
         task.Update(request.Title, request.Description);
         await _taskRepository.UpdateAsync(task, cancellationToken);
+        await _taskCacheInvalidator.InvalidateAsync(request.UserId, request.TaskId, cancellationToken);
         return Result.Success();
     }
 }

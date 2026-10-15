@@ -186,7 +186,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 ### Phase 3 — Cache and Messaging
 
-- **Redis:** Cache Aside for GET task by id.
+- **Redis:** Cache Aside for GET task by id. Absolute TTL of 60 seconds. If deleting the cache key fails, retry up to three times, keep the MongoDB write, and let the TTL bound stale reads. Redis runs in local Compose and on the EC2 Compose host (port not published, memory capped). Design: [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md).
 - **RabbitMQ:** Events (e.g. TaskCreated, TaskCompleted).
 - **NotificationLog:** Repository, persistence, and use in event processing.
 
@@ -203,6 +203,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 ## 13. Document History
 
+- **2026-10-14:** Phase 3 cache implemented: Cache Aside on `GetTaskById`, absolute 60s TTL, three delete retries, no cache-repair queue. Redis is in local Compose and in the EC2 Compose file (unpublished, memory-capped). See [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md) and [superpowers/plans/2026-10-14-phase3-cache.md](superpowers/plans/2026-10-14-phase3-cache.md).
 - **2026-08-10:** Phase 2 Terraform hardening: assume `terraform-deploy-role` + S3 remote state with `use_lockfile` (plan Task 3; former ECR/compute tasks renumbered).
 - **2026-08-02:** Swapped former Phase 2 (Cache/Messaging) and Phase 3 (CI/CD). Phase 2 is now CI/CD with ECR + EC2 + Terraform; Cache/Messaging becomes Phase 3. See CI/CD design spec.
 - Phase 1 Docker stack and healthchecks aligned with repo (`docker-compose.yml`, `docker-compose.override.yml`, API `Dockerfile`); see Engineering Guidelines “Docker and Environment”.

@@ -6,6 +6,7 @@ using TaskFlow.Application.UseCases.Tasks.GetTaskById;
 using TaskFlow.Application.UseCases.Tasks.ListTasks;
 using TaskFlow.Application.UseCases.Tasks.UpdateTask;
 using TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
+using TaskFlow.Application.DTOs;
 using TaskFlow.Application.Enums;
 using TaskFlow.Application.Interfaces;
 using DomainTask = TaskFlow.Domain.Entities.Task;
@@ -36,7 +37,7 @@ public sealed class TaskUseCasesTests
     public async System.Threading.Tasks.Task GetTaskByIdHandler_ShouldReturnNotFound_WhenTaskDoesNotExist()
     {
         var repository = new InMemoryTaskRepository();
-        var handler = new GetTaskByIdQueryHandler(repository);
+        var handler = new GetTaskByIdQueryHandler(repository, new NoOpTaskCache());
 
         var result = await handler.Handle(
             new GetTaskByIdQuery(Guid.NewGuid(), Guid.NewGuid()),
@@ -72,7 +73,7 @@ public sealed class TaskUseCasesTests
         var userId = Guid.NewGuid();
         var task = new DomainTask(userId, "Old", "Old desc");
         await repository.AddAsync(task, CancellationToken.None);
-        var handler = new UpdateTaskCommandHandler(repository);
+        var handler = new UpdateTaskCommandHandler(repository, new NoOpTaskCacheInvalidator());
 
         var updateResult = await handler.Handle(
             new UpdateTaskCommand(userId, task.Id, "New", "New desc"),
@@ -93,7 +94,7 @@ public sealed class TaskUseCasesTests
         var userId = Guid.NewGuid();
         var task = new DomainTask(userId, "Task", null);
         await repository.AddAsync(task, CancellationToken.None);
-        var handler = new UpdateTaskStatusCommandHandler(repository);
+        var handler = new UpdateTaskStatusCommandHandler(repository, new NoOpTaskCacheInvalidator());
 
         var statusResult = await handler.Handle(
             new UpdateTaskStatusCommand(userId, task.Id, DomainTaskStatus.InProgress),
@@ -113,13 +114,31 @@ public sealed class TaskUseCasesTests
         var userId = Guid.NewGuid();
         var task = new DomainTask(userId, "Task", null);
         await repository.AddAsync(task, CancellationToken.None);
-        var handler = new DeleteTaskCommandHandler(repository);
+        var handler = new DeleteTaskCommandHandler(repository, new NoOpTaskCacheInvalidator());
 
         var deleteResult = await handler.Handle(new DeleteTaskCommand(userId, task.Id), CancellationToken.None);
 
         Assert.True(deleteResult.IsSuccess);
         var existing = await repository.GetByIdAsync(userId, task.Id, CancellationToken.None);
         Assert.Null(existing);
+    }
+
+    private sealed class NoOpTaskCacheInvalidator : ITaskCacheInvalidator
+    {
+        public System.Threading.Tasks.Task InvalidateAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
+            => System.Threading.Tasks.Task.CompletedTask;
+    }
+
+    private sealed class NoOpTaskCache : ITaskCache
+    {
+        public System.Threading.Tasks.Task<TaskDto?> GetAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
+            => System.Threading.Tasks.Task.FromResult<TaskDto?>(null);
+
+        public System.Threading.Tasks.Task SetAsync(Guid userId, Guid taskId, TaskDto task, CancellationToken cancellationToken = default)
+            => System.Threading.Tasks.Task.CompletedTask;
+
+        public System.Threading.Tasks.Task<bool> RemoveAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
+            => System.Threading.Tasks.Task.FromResult(true);
     }
 
     private sealed class InMemoryTaskRepository : ITaskRepository
