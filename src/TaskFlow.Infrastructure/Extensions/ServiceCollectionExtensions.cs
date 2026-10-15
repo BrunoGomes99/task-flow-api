@@ -1,7 +1,9 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
+using StackExchange.Redis;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Infrastructure.Caching;
 using TaskFlow.Infrastructure.Configuration;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Infrastructure.Repositories;
@@ -39,6 +41,23 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+
+        var redisSettings = configuration
+            .GetSection(RedisSettings.SectionName)
+            .Get<RedisSettings>() ?? new RedisSettings();
+
+        if (string.IsNullOrWhiteSpace(redisSettings.ConnectionString))
+            throw new InvalidOperationException("Redis:ConnectionString must be configured.");
+
+        services.AddSingleton(redisSettings);
+        services.AddSingleton<IConnectionMultiplexer>(_ =>
+        {
+            var options = ConfigurationOptions.Parse(redisSettings.ConnectionString);
+            options.AbortOnConnectFail = false;
+            return ConnectionMultiplexer.Connect(options);
+        });
+        services.AddSingleton<IRedisStringCache, RedisStringCache>();
+        services.AddSingleton<ITaskCache, RedisTaskCache>();
 
         return services;
     }

@@ -7,8 +7,8 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 - **User** — Register, login (JWT), get profile
 - **Tasks** — Full CRUD, paginated list (filters: title, description, status; sort by due date)
 - **Auth** — JWT (no ASP.NET Identity), BCrypt password hashing, multi-tenancy via `UserId` from token
-- **Phase 2 (in progress)** — GitHub Actions CI + ECR publish behind Environment `production`; Terraform AWS study stack (ECR + EC2 + Docker Compose)
-- **Planned (Phase 3)** — Redis cache (Cache Aside), RabbitMQ events, NotificationLog persistence
+- **Phase 2** — GitHub Actions CI + ECR publish behind Environment `production`; Terraform AWS study stack (ECR + EC2 + Docker Compose)
+- **Phase 3 cache** — Redis Cache Aside on get-task-by-id (60 second absolute TTL). RabbitMQ events and NotificationLog persistence are still planned
 
 ## Tech Stack
 
@@ -19,6 +19,7 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 | Use cases   | MediatR, CQRS (Command and Query Responsibility Segregation) |
 | Validation  | FluentValidation (Application layer, pipeline behavior) |
 | Persistence | MongoDB      |
+| Cache       | Redis (Cache Aside, `GetTaskById` only) |
 | Auth        | JWT, BCrypt  |
 | Testing     | xUnit        |
 | Quality     | SonarLint    |
@@ -56,7 +57,7 @@ The API will listen on the configured port (e.g. `http://localhost:5000`).
 docker-compose up -d
 ```
 
-Starts the API and MongoDB. Health check: `GET /health`.
+Starts the API, MongoDB, and Redis. Redis port `6379` is not published; the API reaches it as `redis:6379`. Health check: `GET /health`. A Redis outage does not fail get-by-id: the handler reads MongoDB.
 
 ### Run tests
 
@@ -82,7 +83,7 @@ dotnet build TaskFlow.slnx --no-restore -c Release
 dotnet test TaskFlow.slnx --no-build -c Release
 ```
 
-AWS apply/destroy, OIDC variables, and EC2 notes: [infra/README.md](infra/README.md). Cache/Messaging remains **Phase 3**.
+AWS apply/destroy, OIDC variables, and EC2 notes: [infra/README.md](infra/README.md). Redis cache is in Phase 3; RabbitMQ and NotificationLog are still planned.
 
 ## Project Structure
 
@@ -102,7 +103,7 @@ src/
     Interfaces/              # ITaskRepository, IUserRepository, etc.
     Behaviors/               # ValidationBehavior (FluentValidation pipeline)
     Extensions/              # AddApplicationValidation, DI registration
-  TaskFlow.Infrastructure/   # MongoDB, JWT, (Redis, RabbitMQ in Phase 3)
+  TaskFlow.Infrastructure/   # MongoDB, JWT, Redis (RabbitMQ still planned)
   TaskFlow.Api/              # Controllers, middleware, configuration
 tests/
   TaskFlow.Domain.Tests/
@@ -118,7 +119,9 @@ tests/
 
 - [Project Specification](docs/PROJECT_SPEC.md) — Scope, domain, auth, API contract, phased plan  
 - [Engineering Guidelines](docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
-- [CI/CD + EC2 design](docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md) — Approved Phase 2 design (CI first; ECR + EC2 CD scaffold)  
+- [CI/CD + EC2 design](docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md) — Approved Phase 2 design (CI first; ECR + EC2 CD scaffold)
+- [Phase 3 cache design](docs/superpowers/specs/2026-10-14-phase3-cache-design.md) — Cache Aside, 60s absolute TTL, three delete retries
+- [Phase 3 cache plan](docs/superpowers/plans/2026-10-14-phase3-cache.md) — Implementation notes for the Redis slice  
 - [CI/CD implementation plan](docs/superpowers/plans/2026-08-02-ci-cd-implementation.md) — Task breakdown for branch `feature/ci-cd-implementation`  
 - [Infrastructure (Terraform)](infra/README.md) — Auth, S3 state, apply/destroy, ECR publish gate, ECS evolution notes  
 

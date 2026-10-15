@@ -31,7 +31,8 @@ public sealed class InfrastructureRegistrationTests
                 [$"{JwtSettings.SectionName}:Secret"] = "TaskFlow_DI_Test_Secret_AtLeast32BytesLong!",
                 [$"{JwtSettings.SectionName}:Issuer"] = "TaskFlow.DI",
                 [$"{JwtSettings.SectionName}:Audience"] = "TaskFlow.Api.DI",
-                [$"{JwtSettings.SectionName}:AccessTokenLifetimeSeconds"] = "3600"
+                [$"{JwtSettings.SectionName}:AccessTokenLifetimeSeconds"] = "3600",
+                [$"{RedisSettings.SectionName}:ConnectionString"] = "127.0.0.1:1,abortConnect=false"
             })
             .Build();
 

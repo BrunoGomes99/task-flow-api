@@ -10,10 +10,12 @@ namespace TaskFlow.Application.UseCases.Tasks.DeleteTask;
 public sealed class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand, Result>
 {
     private readonly ITaskRepository _taskRepository;
+    private readonly ITaskCacheInvalidator _taskCacheInvalidator;
 
-    public DeleteTaskCommandHandler(ITaskRepository taskRepository)
+    public DeleteTaskCommandHandler(ITaskRepository taskRepository, ITaskCacheInvalidator taskCacheInvalidator)
     {
         _taskRepository = taskRepository;
+        _taskCacheInvalidator = taskCacheInvalidator;
     }
 
     public async Task<Result> Handle(DeleteTaskCommand request, CancellationToken cancellationToken)
@@ -28,6 +30,7 @@ public sealed class DeleteTaskCommandHandler : IRequestHandler<DeleteTaskCommand
                 id: request.TaskId.ToString("D"));
         }
 
+        await _taskCacheInvalidator.InvalidateAsync(request.UserId, request.TaskId, cancellationToken);
         return Result.Success();
     }
 }
