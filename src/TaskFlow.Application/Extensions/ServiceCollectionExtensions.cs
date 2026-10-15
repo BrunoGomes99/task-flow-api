@@ -3,6 +3,8 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using TaskFlow.Application.Behaviors;
+using TaskFlow.Application.Caching;
+using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.UseCases.Tasks.CreateTask;
 
 namespace TaskFlow.Application.Extensions;
@@ -13,8 +15,8 @@ namespace TaskFlow.Application.Extensions;
 public static class ServiceCollectionExtensions
 {
     /// <summary>
-    /// Registers all FluentValidation validators from the Application assembly and adds
-    /// the ValidationBehavior to the MediatR pipeline so every request is validated before its handler runs.
+    /// Registers all FluentValidation validators from the Application assembly, adds
+    /// the ValidationBehavior to the MediatR pipeline, and registers task-cache invalidation.
     /// </summary>
     public static IServiceCollection AddApplicationValidation(this IServiceCollection services)
     {
@@ -22,6 +24,7 @@ public static class ServiceCollectionExtensions
 
         services.AddValidatorsFromAssembly(assembly);
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
+        services.AddSingleton<ITaskCacheInvalidator, TaskCacheInvalidator>();
 
         return services;
     }

@@ -170,11 +170,15 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Redis (Cache)
 
-- [ ] **Cache interface in Application** — e.g. `ITaskCache` or `ICacheService` with Get/Set (or GetOrSet) for task by id.
-- [ ] **Implementation in Infrastructure** — Redis-backed implementation; connection and serialization configured in Infrastructure.
-- [ ] **Cache Aside for GetTaskById** — Use case (or application service) checks cache first; on miss, load from repository and populate cache; cache key includes UserId and TaskId for multi-tenancy safety.
-- [ ] **Invalidation** — Update and Delete task invalidate or remove the cached entry for that task.
-- [ ] **docker-compose** — Redis service added; API configured to use Redis when available.
+> Design (2026-10-14, implemented): [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md). Plan: [superpowers/plans/2026-10-14-phase3-cache.md](superpowers/plans/2026-10-14-phase3-cache.md).
+
+- [x] **Cache interface in Application** — e.g. `ITaskCache` or `ICacheService` with Get/Set (or GetOrSet) for task by id.
+- [x] **Implementation in Infrastructure** — Redis-backed implementation; connection and serialization configured in Infrastructure.
+- [x] **Cache Aside for GetTaskById** — Use case (or application service) checks cache first; on miss, load from repository and populate cache; cache key includes UserId and TaskId for multi-tenancy safety.
+- [x] **Absolute TTL 60s** — Entry expires 60 seconds after it is written. Do not use sliding expiration.
+- [x] **Invalidation** — Update and Delete remove the cached entry after the MongoDB write. Retry the delete up to three times. If all attempts fail, log the key, keep the MongoDB result, and do not fail the request. Stale GETs are bounded by the TTL. No outbox or RabbitMQ repair for the cache.
+- [x] **Redis read failure** — Treat as a cache miss and load from MongoDB.
+- [x] **docker-compose** — Redis added to the local stack and to `infra/compose/docker-compose.aws.yml`. Do not publish port `6379`. On EC2, cap Redis memory (about 64 MiB, `allkeys-lru`). API configured to use Redis when available.
 
 ### RabbitMQ (Messaging)
 
@@ -193,7 +197,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Testing (Phase 3)
 
-- [ ] **Cache and messaging mocked in unit tests** — New use-case tests still mock cache and publisher; no real Redis/RabbitMQ in unit tests.
+- [x] **Cache and messaging mocked in unit tests** — New use-case tests still mock cache and publisher; no real Redis/RabbitMQ in unit tests. Cache is mocked. Publisher tests arrive with RabbitMQ.
 - [ ] **Integration tests (optional)** — If you add integration tests for cache or messaging, they are clearly separated from unit tests and optional for local runs.
 
 ---
