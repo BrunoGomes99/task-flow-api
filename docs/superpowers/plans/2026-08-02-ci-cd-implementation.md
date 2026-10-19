@@ -407,7 +407,7 @@ Permissions: `ecr:GetAuthorizationToken` plus pull actions on the specific repos
 
 - [x] **Step 3:** `docker-compose.aws.yml`
 
-Services: `taskflow.api` (image from ECR URL + tag variable) and `mongo` (pinned tag, e.g. `mongo:8.0`), shared bridge network, named volume for Mongo data. API env for `MongoDb__ConnectionString` pointing at service name `mongo`. Map host `8080:8080`.
+Services: `taskflow.api` (image from ECR URL + tag variable) and `mongo` (pinned tag, e.g. `mongo:8.0.30`), shared bridge network, named volume for Mongo data. API env for `MongoDb__ConnectionString` pointing at service name `mongo`. Map host `8080:8080`.
 
 - [x] **Step 4: user-data template**
 
