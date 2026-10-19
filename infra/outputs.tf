@@ -13,6 +13,16 @@ output "ecr_repository_url" {
   value       = module.ecr.repository_url
 }
 
+output "ecr_scheduler_repository_url" {
+  description = "URL of the ECR repository for the scheduler image."
+  value       = module.ecr_scheduler.repository_url
+}
+
+output "ecr_notifications_repository_url" {
+  description = "URL of the ECR repository for the notifications image."
+  value       = module.ecr_notifications.repository_url
+}
+
 output "ecr_repository_name" {
   description = "Name of the ECR repository for the API image."
   value       = module.ecr.repository_name

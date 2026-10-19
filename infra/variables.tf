@@ -55,8 +55,20 @@ variable "ecr_repository_name" {
   default     = "taskflow-api"
 }
 
+variable "ecr_scheduler_repository_name" {
+  description = "Name of the ECR repository for the scheduler image."
+  type        = string
+  default     = "taskflow-scheduler"
+}
+
+variable "ecr_notifications_repository_name" {
+  description = "Name of the ECR repository for the notifications image."
+  type        = string
+  default     = "taskflow-notifications"
+}
+
 variable "instance_type" {
-  description = "EC2 instance type for the API + Mongo host."
+  description = "EC2 instance type for the Compose host. Due reminders add RabbitMQ and two workers; use t3.small if t3.micro runs out of memory."
   type        = string
   default     = "t3.micro"
 }
@@ -105,4 +117,53 @@ variable "mongo_root_password" {
     condition     = length(var.mongo_root_password) >= 12
     error_message = "mongo_root_password must be at least 12 characters."
   }
+}
+
+variable "rabbitmq_user" {
+  description = "RabbitMQ user on the Compose network."
+  type        = string
+  default     = "taskflow"
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9]+$", var.rabbitmq_user))
+    error_message = "rabbitmq_user must contain only letters and digits."
+  }
+}
+
+variable "rabbitmq_password" {
+  description = "RabbitMQ password. Do not commit real values."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = can(regex("^[A-Za-z0-9]{12,}$", var.rabbitmq_password))
+    error_message = "rabbitmq_password must be at least 12 letters or digits, with no spaces or symbols."
+  }
+}
+
+variable "brevo_api_key" {
+  description = "Brevo API key for the notifications worker. Do not commit real values."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = length(var.brevo_api_key) > 0
+    error_message = "brevo_api_key must not be empty."
+  }
+}
+
+variable "brevo_sender_email" {
+  description = "Verified Brevo sender email address."
+  type        = string
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.brevo_sender_email))
+    error_message = "brevo_sender_email must be an email address."
+  }
+}
+
+variable "brevo_sender_name" {
+  description = "Display name on reminder emails."
+  type        = string
+  default     = "TaskFlow"
 }

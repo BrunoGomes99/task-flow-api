@@ -41,6 +41,8 @@ public static class ServiceCollectionExtensions
 
         services.AddScoped<IUserRepository, UserRepository>();
         services.AddScoped<ITaskRepository, TaskRepository>();
+        services.AddScoped<ITaskReminderRepository, TaskReminderRepository>();
+        services.AddScoped<INotificationLogRepository, NotificationLogRepository>();
 
         var redisSettings = configuration
             .GetSection(RedisSettings.SectionName)

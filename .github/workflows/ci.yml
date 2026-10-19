@@ -9,14 +9,18 @@
 #                       (ECR push + ssm:SendCommand / GetCommandInvocation + ec2:DescribeInstances)
 #   ECR_REPOSITORY      e.g. taskflow-api
 # Optional:
+#   SCHEDULER_ECR_REPOSITORY       default taskflow-scheduler
+#   NOTIFICATIONS_ECR_REPOSITORY   default taskflow-notifications
 #   NAME_PREFIX         default taskflow (must match Terraform name_prefix; tags Name=<prefix>-api)
 #   EC2_INSTANCE_ID     pin a specific instance instead of discovering by tag TaskFlowRedeploy=enabled
 #
 # Also create Environment "production" with required reviewers so publish waits for Approve.
 #
-# Temporary until ECS: after push, SSM Run Command updates /opt/taskflow/.env with
-# API_IMAGE=...:<github.sha>, then docker compose pull && up -d. Replace with ECS
-# update-service when migrating off EC2 Compose.
+# Temporary until ECS: after push, SSM Run Command copies docker-compose.aws.yml to
+# /opt/taskflow, pins API/scheduler/notifications images to github.sha, then
+# docker compose pull && up -d. RabbitMQ and Brevo values must already be in
+# that .env (user-data writes them on first boot; an older instance needs them
+# added once). Replace with ECS update-service when migrating off EC2 Compose.
 
 name: CI
 
@@ -59,7 +63,7 @@ jobs:
         run: dotnet test TaskFlow.slnx --no-build -c Release --verbosity normal
 
   publish-ecr:
-    name: Publish API image to ECR
+    name: Publish images to ECR
     needs: build-and-test
     if: >
       github.event_name == 'workflow_dispatch' ||
@@ -74,7 +78,9 @@ jobs:
       registry: ${{ steps.ecr-login.outputs.registry }}
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      API_REPOSITORY: ${{ vars.API_REPOSITORY }}
+      SCHEDULER_REPOSITORY: ${{ vars.SCHEDULER_REPOSITORY }}
+      NOTIFICATIONS_REPOSITORY: ${{ vars.NOTIFICATIONS_REPOSITORY }}
     steps:
       - uses: actions/checkout@v4
 
@@ -88,17 +94,24 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image
+      - name: Build, tag, and push images
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          IMAGE_TAG: ${{ github.sha }}          
         run: |
           set -euo pipefail
-          IMAGE_URI="${REGISTRY}/${ECR_REPOSITORY}"
-          docker build -f src/TaskFlow.Api/Dockerfile -t "${IMAGE_URI}:${IMAGE_TAG}" -t "${IMAGE_URI}:latest" .
-          docker push "${IMAGE_URI}:${IMAGE_TAG}"
-          docker push "${IMAGE_URI}:latest"
-          echo "Pushed ${IMAGE_URI}:${IMAGE_TAG} and ${IMAGE_URI}:latest"
+          build_push() {
+            local dockerfile="$1"
+            local repo="$2"
+            local uri="${REGISTRY}/${repo}"
+            docker build -f "${dockerfile}" -t "${uri}:${IMAGE_TAG}" -t "${uri}:latest" .
+            docker push "${uri}:${IMAGE_TAG}"
+            docker push "${uri}:latest"
+            echo "Pushed ${uri}:${IMAGE_TAG} and ${uri}:latest"
+          }
+          build_push src/TaskFlow.Api/Dockerfile "${API_REPOSITORY}"
+          build_push src/TaskFlow.Scheduler/Dockerfile "${SCHEDULER_REPOSITORY}"
+          build_push src/TaskFlow.Notifications/Dockerfile "${NOTIFICATIONS_REPOSITORY}"
 
   # Temporary bridge until ECS: pin Compose to github.sha via SSM (not :latest).
   redeploy-ec2:
@@ -113,11 +126,15 @@ jobs:
       id-token: write
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+      API_REPOSITORY: ${{ vars.API_REPOSITORY }}
+      SCHEDULER_REPOSITORY: ${{ vars.SCHEDULER_REPOSITORY }}
+      NOTIFICATIONS_REPOSITORY: ${{ vars.NOTIFICATIONS_REPOSITORY }}
       NAME_PREFIX: ${{ vars.NAME_PREFIX }}
       IMAGE_TAG: ${{ needs.publish-ecr.outputs.image_tag }}
       REGISTRY: ${{ needs.publish-ecr.outputs.registry }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -146,23 +163,38 @@ jobs:
             exit 1
           fi
 
-          echo "Redeploying instance ${INSTANCE_ID} to ${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}"
+          echo "Redeploying instance ${INSTANCE_ID} to ${REGISTRY}/${API_REPOSITORY}:${IMAGE_TAG}"
+
+          COMPOSE_B64="$(base64 -w 0 infra/compose/docker-compose.aws.yml)"
 
           REMOTE_SCRIPT=$(cat <<EOF
           set -euo pipefail
           cd /opt/taskflow
-          API_IMAGE_VALUE='${REGISTRY}/${ECR_REPOSITORY}:${IMAGE_TAG}'
-          if grep -q '^API_IMAGE=' .env; then
-            sed -i "s|^API_IMAGE=.*|API_IMAGE=\${API_IMAGE_VALUE}|" .env
-          else
-            printf 'API_IMAGE=%s\n' "\${API_IMAGE_VALUE}" >> .env
-          fi
+          printf '%s' '${COMPOSE_B64}' | base64 -d > /opt/taskflow/docker-compose.yml
+          set_env() {
+            key="\$1"
+            value="\$2"
+            if grep -q "^\${key}=" .env; then
+              sed -i "s|^\${key}=.*|\${key}=\${value}|" .env
+            else
+              printf '%s=%s\n' "\${key}" "\${value}" >> .env
+            fi
+          }
+          set_env API_IMAGE '${REGISTRY}/${API_REPOSITORY}:${IMAGE_TAG}'
+          set_env SCHEDULER_IMAGE '${REGISTRY}/${SCHEDULER_REPOSITORY}:${IMAGE_TAG}'
+          set_env NOTIFICATIONS_IMAGE '${REGISTRY}/${NOTIFICATIONS_REPOSITORY}:${IMAGE_TAG}'
+          for key in RABBITMQ_USER RABBITMQ_PASSWORD BREVO_API_KEY BREVO_SENDER_EMAIL; do
+            if ! grep -Eq "^\${key}=.+" .env; then
+              echo "Missing \${key} in /opt/taskflow/.env. Add it on the instance; user-data does not re-run."
+              exit 1
+            fi
+          done
           aws ecr get-login-password --region '${AWS_REGION}' \
             | docker login --username AWS --password-stdin '${REGISTRY}'
-          docker compose pull taskflow.api
+          docker compose pull
           docker compose up -d --wait
           curl -fsS http://127.0.0.1:8080/health
-          echo "Redeploy OK: \${API_IMAGE_VALUE}"
+          echo "Redeploy OK: ${IMAGE_TAG}"
           EOF
           )
 

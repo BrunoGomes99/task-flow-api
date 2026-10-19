@@ -41,10 +41,33 @@ public sealed class MongoIndexesInitializer
                 new CreateIndexOptions
                 {
                     Name = "UserId_1_DueDate_1"
+                }),
+            new CreateIndexModel<TaskDocument>(
+                Builders<TaskDocument>.IndexKeys
+                    .Ascending(x => x.Status)
+                    .Ascending(x => x.DueDate),
+                new CreateIndexOptions
+                {
+                    Name = "Status_1_DueDate_1"
+                })
+        };
+
+        var notificationLogIndexes = new[]
+        {
+            new CreateIndexModel<NotificationLogDocument>(
+                Builders<NotificationLogDocument>.IndexKeys
+                    .Ascending(x => x.TaskId)
+                    .Ascending(x => x.EventType)
+                    .Ascending(x => x.DueDate),
+                new CreateIndexOptions
+                {
+                    Unique = true,
+                    Name = "TaskId_1_EventType_1_DueDate_1"
                 })
         };
 
         await _context.Users.Indexes.CreateManyAsync(userIndexes, cancellationToken);
         await _context.Tasks.Indexes.CreateManyAsync(taskIndexes, cancellationToken);
+        await _context.NotificationLogs.Indexes.CreateManyAsync(notificationLogIndexes, cancellationToken);
     }
 }
