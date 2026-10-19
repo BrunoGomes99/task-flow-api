@@ -26,7 +26,7 @@
 - Do not enlarge the EC2 instance. The study host stays `t3.micro`.
 - Unit tests mock the cache. No real Redis in unit tests.
 - UserId still comes from the JWT only. Another user's task stays a 404.
-- Messaging (`TaskCreated`, `TaskCompleted`, NotificationLog) is out of scope.
+- Messaging (`TaskCreated`, `TaskCompleted`, NotificationLog) is out of scope for this cache plan. The later messaging shape is the due reminder in [../specs/2026-10-16-phase3-due-reminder-design.md](../specs/2026-10-16-phase3-due-reminder-design.md). That design may raise the EC2 type to `t3.small`; this plan's `t3.micro` limit applied to the cache slice only.
 
 ---
 

@@ -17,7 +17,7 @@ Build a RESTful Web API using **.NET 10** with:
 - MongoDB (NoSQL)
 - Docker containerization
 - GitHub Actions CI/CD (Phase 2), with a low-cost AWS study path (ECR + EC2 + Terraform)
-- RabbitMQ and Redis in a later phase (Phase 3)
+- Redis cache and RabbitMQ due-date reminders in a later phase (Phase 3)
 - Unit testing with xUnit
 - SonarLint for code quality
 
@@ -39,7 +39,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 - **Domain** — Entities, value objects, domain rules. No dependencies on other layers.
 - **Application** — Use cases (MediatR handlers), interfaces (repositories, services), DTOs, Command/Query Responsibility Segregation (CQRS), FluentValidation validators, pipeline behaviors.
-- **Infrastructure** — Implementations of external concerns: MongoDB; Redis and RabbitMQ in Phase 3.
+- **Infrastructure** — Implementations of external concerns: MongoDB; Redis and RabbitMQ in Phase 3. Phase 3 also adds two worker hosts (scheduler and notifications) beside the API.
 - **API** — Controllers, middleware, filters, and configuration. Controllers send Commands/Queries via `IMediator`.
 - **Tests** — Unit tests for Domain and Application.
 
@@ -83,12 +83,15 @@ The system must be simple in domain complexity but architecturally mature.
 - **Domain validation:** Title required (not null/empty, min and max length); Description optional with max length. Enforced in the entity constructor.
 - **Status transitions:** Allowed: Pending ↔ InProgress, Pending → Completed, InProgress → Completed. Once a task is Completed, its status cannot be changed back. Status is changed via explicit methods: SetPending(), SetInProgress(), SetCompleted(). The frontend may show a warning that completing a task cannot be undone.
 
-**NotificationLog** (Phase 1: entity only; Phase 3: full implementation with messaging)
+**NotificationLog** (Phase 1: entity only; Phase 3: receipt that a due reminder was sent)
 
 - Id
 - TaskId
-- EventType
-- ProcessedAt
+- EventType (`DueSoon` only)
+- DueDate (the due instant this receipt covers; added in Phase 3)
+- ProcessedAt (UTC instant the receipt was stored, after the email was accepted)
+
+Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum listed `TaskCreated` and `TaskCompleted`. Those two values were never published. Phase 3 replaces them with `DueSoon` and adds `DueDate`. There is no HTTP endpoint for this collection.
 
 ---
 
@@ -143,6 +146,7 @@ The system must be simple in domain complexity but architecturally mature.
 - Indexing:
   - Index on UserId
   - Compound index (UserId + DueDate)
+  - Phase 3: compound index (Status + DueDate) on Tasks for the reminder scan; unique index (TaskId + EventType + DueDate) on NotificationLogs
 - Use the Repository pattern for data access.
 
 ---
@@ -159,7 +163,8 @@ The system must be simple in domain complexity but architecturally mature.
 ## 10. Containerization
 
 - **Phase 1 (done):** Multi-stage **Dockerfile** for the API; **docker-compose** with API + MongoDB; Mongo **healthcheck** and API **`depends_on: service_healthy`**; API **healthcheck** against `GET /health`; connection string via **environment / `.env`** (see `.env.example`); pinned service image tags; optional **mongo-express** for local DB inspection only.
-- **Later:** docker-compose can add RabbitMQ and Redis (Phase 3).
+- **Phase 3 cache (done):** Redis in local Compose and in `infra/compose/docker-compose.aws.yml`.
+- **Phase 3 reminders:** local Compose and the EC2 Compose file also run RabbitMQ plus the scheduler and notifications workers. Design: [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
 
 ---
 
@@ -172,7 +177,7 @@ The system must be simple in domain complexity but architecturally mature.
 - Task: full CRUD, paginated list (PageSize max 20), filters (title, description, status), ordering by DueDate.
 - Stack: .NET 10, MediatR (CQRS), FluentValidation, JWT (no Identity), BCrypt, MongoDB.
 - Docker: Dockerfile + docker-compose (API + MongoDB); health checks; configuration via env / `.env` for local stacks.
-- NotificationLog: **entity only** in Domain; no repository or endpoints.
+- NotificationLog: **entity only** in Domain; no repository or endpoints. Phase 3 extends it (see Phase 3).
 - Tests: xUnit for Domain and Application (mocks); progressive coverage.
 - Quality: SonarLint, global exception middleware, logging, multi-tenancy by UserId from JWT.
 
@@ -184,11 +189,10 @@ The system must be simple in domain complexity but architecturally mature.
 - **Future (documented only):** evolve the same ECR image to **ECS** (Fargate + ALB); move Mongo off the EC2 host; **remove** SSM Compose redeploy. On ECS, pin the running task to an immutable image tag (`github.sha`) or digest—not `:latest`.
 - Design: [superpowers/specs/2026-08-02-ci-cd-ec2-design.md](superpowers/specs/2026-08-02-ci-cd-ec2-design.md).
 
-### Phase 3 — Cache and Messaging
+### Phase 3 — Cache and Due Reminder
 
-- **Redis:** Cache Aside for GET task by id. Absolute TTL of 60 seconds. If deleting the cache key fails, retry up to three times, keep the MongoDB write, and let the TTL bound stale reads. Redis runs in local Compose and on the EC2 Compose host (port not published, memory capped). Design: [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md).
-- **RabbitMQ:** Events (e.g. TaskCreated, TaskCompleted).
-- **NotificationLog:** Repository, persistence, and use in event processing.
+- **Redis (done):** Cache Aside for GET task by id. Absolute TTL of 60 seconds. If deleting the cache key fails, retry up to three times, keep the MongoDB write, and let the TTL bound stale reads. Redis runs in local Compose and on the EC2 Compose host (port not published, memory capped). Design: [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md).
+- **Due reminder (implemented):** About 24 hours before `DueDate`, a scheduler worker publishes `DueSoon` to RabbitMQ. A notifications worker sends one Brevo email and stores `NotificationLog` as the receipt. Tasks with no `DueDate`, and completed tasks, are skipped. No mail on create or complete. The API does not publish or consume. Both workers run in local Compose and on the current EC2 Compose host (not ECS). If `t3.micro` runs out of memory, the instance type becomes `t3.small`. Design: [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
 
 ---
 
@@ -203,6 +207,7 @@ The system must be simple in domain complexity but architecturally mature.
 
 ## 13. Document History
 
+- **2026-10-16:** Phase 3 messaging redefined. `NotificationLog` is the receipt for a `DueSoon` email about 24 hours before `DueDate`, sent by a notifications worker via Brevo. A scheduler worker publishes. `TaskCreated` / `TaskCompleted` publishes are dropped. ECS stays out of this phase; EC2 may move from `t3.micro` to `t3.small` if memory is short. See [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
 - **2026-10-14:** Phase 3 cache implemented: Cache Aside on `GetTaskById`, absolute 60s TTL, three delete retries, no cache-repair queue. Redis is in local Compose and in the EC2 Compose file (unpublished, memory-capped). See [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md) and [superpowers/plans/2026-10-14-phase3-cache.md](superpowers/plans/2026-10-14-phase3-cache.md).
 - **2026-08-10:** Phase 2 Terraform hardening: assume `terraform-deploy-role` + S3 remote state with `use_lockfile` (plan Task 3; former ECR/compute tasks renumbered).
 - **2026-08-02:** Swapped former Phase 2 (Cache/Messaging) and Phase 3 (CI/CD). Phase 2 is now CI/CD with ECR + EC2 + Terraform; Cache/Messaging becomes Phase 3. See CI/CD design spec.

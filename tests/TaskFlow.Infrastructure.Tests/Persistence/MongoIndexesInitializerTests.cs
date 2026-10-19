@@ -43,5 +43,12 @@ public sealed class MongoIndexesInitializerTests
         Assert.Contains("Email_1", userIndexNames);
         Assert.Contains("UserId_1", taskIndexNames);
         Assert.Contains("UserId_1_DueDate_1", taskIndexNames);
+        Assert.Contains("Status_1_DueDate_1", taskIndexNames);
+
+        var logIndexes = await context.NotificationLogs.Indexes.ListAsync(CancellationToken.None);
+        var logIndexNames = (await logIndexes.ToListAsync(CancellationToken.None))
+            .Select(index => index["name"].AsString)
+            .ToList();
+        Assert.Contains("TaskId_1_EventType_1_DueDate_1", logIndexNames);
     }
 }

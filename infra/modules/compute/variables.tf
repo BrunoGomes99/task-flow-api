@@ -23,8 +23,18 @@ variable "ecr_repository_url" {
   type        = string
 }
 
-variable "ecr_repository_arn" {
-  description = "ECR repository ARN used to scope pull permissions."
+variable "ecr_repository_arns" {
+  description = "ECR repository ARNs the instance may pull (API, scheduler, notifications)."
+  type        = list(string)
+}
+
+variable "scheduler_repository_url" {
+  description = "ECR repository URL for the scheduler image (registry/name)."
+  type        = string
+}
+
+variable "notifications_repository_url" {
+  description = "ECR repository URL for the notifications image (registry/name)."
   type        = string
 }
 
@@ -74,4 +84,31 @@ variable "mongo_root_password" {
   description = "MongoDB root password. Written to the instance .env only."
   type        = string
   sensitive   = true
+}
+
+variable "rabbitmq_user" {
+  description = "RabbitMQ user on the Compose network. Use letters and digits; avoid $ and quotes."
+  type        = string
+}
+
+variable "rabbitmq_password" {
+  description = "RabbitMQ password. Written to the instance .env only. Use letters and digits; avoid $ and quotes."
+  type        = string
+  sensitive   = true
+}
+
+variable "brevo_api_key" {
+  description = "Brevo API key used by the notifications worker. Written to the instance .env only."
+  type        = string
+  sensitive   = true
+}
+
+variable "brevo_sender_email" {
+  description = "Verified Brevo sender address."
+  type        = string
+}
+
+variable "brevo_sender_name" {
+  description = "Display name of the Brevo sender."
+  type        = string
 }

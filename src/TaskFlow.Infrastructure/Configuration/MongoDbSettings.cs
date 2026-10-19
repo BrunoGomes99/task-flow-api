@@ -11,4 +11,6 @@ public sealed class MongoDbSettings
     public string UsersCollectionName { get; set; } = "Users";
 
     public string TasksCollectionName { get; set; } = "Tasks";
+
+    public string NotificationLogsCollectionName { get; set; } = "NotificationLogs";
 }

@@ -32,4 +32,7 @@ public sealed class TaskFlowMongoContext
     public IMongoCollection<UserDocument> Users => _database.GetCollection<UserDocument>(_settings.UsersCollectionName);
 
     public IMongoCollection<TaskDocument> Tasks => _database.GetCollection<TaskDocument>(_settings.TasksCollectionName);
+
+    public IMongoCollection<NotificationLogDocument> NotificationLogs =>
+        _database.GetCollection<NotificationLogDocument>(_settings.NotificationLogsCollectionName);
 }
