@@ -27,8 +27,15 @@ locals {
   compose_yaml = file("${path.root}/compose/docker-compose.aws.yml")
   env_file = join("\n", [
     "API_IMAGE=${var.ecr_repository_url}:${var.api_image_tag}",
+    "SCHEDULER_IMAGE=${var.scheduler_repository_url}:${var.api_image_tag}",
+    "NOTIFICATIONS_IMAGE=${var.notifications_repository_url}:${var.api_image_tag}",
     "MONGO_ROOT_USERNAME=${var.mongo_root_username}",
     "MONGO_ROOT_PASSWORD=${var.mongo_root_password}",
+    "RABBITMQ_USER=${var.rabbitmq_user}",
+    "RABBITMQ_PASSWORD=${var.rabbitmq_password}",
+    "BREVO_API_KEY=${var.brevo_api_key}",
+    "BREVO_SENDER_EMAIL=${var.brevo_sender_email}",
+    "BREVO_SENDER_NAME=${var.brevo_sender_name}",
     "JWT_SECRET=${var.jwt_secret}",
     "JWT_ISSUER=${var.jwt_issuer}",
     "JWT_AUDIENCE=${var.jwt_audience}",

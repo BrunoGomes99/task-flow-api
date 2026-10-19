@@ -22,30 +22,30 @@ public sealed class TaskRepository : ITaskRepository
         _tasks = context.Tasks;
     }
 
-    public async System.Threading.Tasks.Task<DomainTask?> GetByIdAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task<DomainTask?> GetByIdAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
     {
         var document = await _tasks.Find(x => x.UserId == userId && x.Id == taskId).FirstOrDefaultAsync(cancellationToken);
         return document is null ? null : TaskDocumentMapper.ToDomain(document);
     }
 
-    public async System.Threading.Tasks.Task AddAsync(DomainTask task, CancellationToken cancellationToken = default)
+    public async Task AddAsync(DomainTask task, CancellationToken cancellationToken = default)
     {
         await _tasks.InsertOneAsync(TaskDocumentMapper.ToDocument(task), cancellationToken: cancellationToken);
     }
 
-    public async System.Threading.Tasks.Task UpdateAsync(DomainTask task, CancellationToken cancellationToken = default)
+    public async Task UpdateAsync(DomainTask task, CancellationToken cancellationToken = default)
     {
         var filter = Builders<TaskDocument>.Filter.Where(x => x.Id == task.Id && x.UserId == task.UserId);
         await _tasks.ReplaceOneAsync(filter, TaskDocumentMapper.ToDocument(task), cancellationToken: cancellationToken);
     }
 
-    public async System.Threading.Tasks.Task<bool> DeleteAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
+    public async Task<bool> DeleteAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
     {
         var result = await _tasks.DeleteOneAsync(x => x.UserId == userId && x.Id == taskId, cancellationToken);
         return result.DeletedCount > 0;
     }
 
-    public async System.Threading.Tasks.Task<PagedResult<DomainTask>> GetPagedAsync(
+    public async Task<PagedResult<DomainTask>> GetPagedAsync(
         Guid userId,
         int pageNumber,
         int pageSize,

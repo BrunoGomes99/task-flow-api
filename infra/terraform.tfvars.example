@@ -4,6 +4,9 @@ terraform_deploy_role_arn = "arn:aws:iam::123456789012:role/terraform-deploy-rol
 # Required secrets (placeholders only — replace in gitignored terraform.tfvars):
 jwt_secret          = "replace-with-a-32-character-or-longer-secret"
 mongo_root_password = "replace-with-a-strong-mongo-password"
+rabbitmq_password   = "replacewithrabbit12"
+brevo_api_key       = "replace-with-brevo-api-key"
+brevo_sender_email  = "you@example.com"
 
 # Optional overrides:
 # name_prefix         = "taskflow"
@@ -12,8 +15,12 @@ mongo_root_password = "replace-with-a-strong-mongo-password"
 # allowed_api_cidr    = "0.0.0.0/0"
 # allowed_ssh_cidr    = ""
 # ecr_repository_name = "taskflow-api"
-# instance_type       = "t3.micro"
+# ecr_scheduler_repository_name = "taskflow-scheduler"
+# ecr_notifications_repository_name = "taskflow-notifications"
+# instance_type       = "t3.micro" # use t3.small if the host runs out of memory
 # api_image_tag       = "latest"
 # jwt_issuer          = "TaskFlow"
 # jwt_audience        = "TaskFlow.Api"
 # mongo_root_username = "taskflow"
+# rabbitmq_user       = "taskflow"
+# brevo_sender_name   = "TaskFlow"

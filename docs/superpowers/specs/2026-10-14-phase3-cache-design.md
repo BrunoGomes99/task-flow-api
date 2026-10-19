@@ -7,7 +7,7 @@ Status: **Implemented** on `feature/cache-implementation`. Design approved 2026-
 
 Record how Redis cache behaves for `GetTaskById` before Phase 3 coding starts: Cache Aside, a fixed lifetime, and what the API does when deleting the cache key fails.
 
-Messaging (`TaskCreated`, `TaskCompleted`, NotificationLog) is unchanged by this note.
+Messaging is specified separately, and no longer as `TaskCreated` / `TaskCompleted` log writes. See [2026-10-16-phase3-due-reminder-design.md](2026-10-16-phase3-due-reminder-design.md). This cache note does not change that design.
 
 ## Non-goals
 
@@ -17,7 +17,7 @@ Messaging (`TaskCreated`, `TaskCompleted`, NotificationLog) is unchanged by this
 - Returning HTTP 500 after the task update or delete has already committed, only because the cache delete failed.
 - An outbox, retry queue, or RabbitMQ message whose job is to repair the cache.
 - Publishing Redis port `6379` on the EC2 security group or the host. Redis stays on the Compose network, same rule as MongoDB.
-- A larger EC2 instance. The study host stays `t3.micro`.
+- A larger EC2 instance for the cache slice. The study host stayed `t3.micro` for Redis. The due-reminder design may raise it to `t3.small` if RabbitMQ and the two workers do not fit in 1 GiB.
 
 ## Decisions (Approved)
 

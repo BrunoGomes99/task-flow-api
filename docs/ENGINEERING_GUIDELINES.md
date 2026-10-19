@@ -101,7 +101,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ### Infrastructure Layer
 
-- [x] **MongoDB** — Separate collections for Users, Tasks; NotificationLog collection optional in Phase 1 (can be added in Phase 3 — Cache and Messaging).
+- [x] **MongoDB** — Separate collections for Users, Tasks; NotificationLog collection optional in Phase 1 (Phase 3 adds it as the due-reminder receipt).
 - [x] **Repositories** — UserRepository and TaskRepository implement Application interfaces; use official MongoDB driver or agreed abstraction.
 - [x] **Indexes** — Index on UserId for Tasks; compound index (UserId + DueDate) for Tasks; index on UserId (or Email for login) for Users as needed.
 - [x] **JWT** — `JwtService` issues JWT access tokens with UserId in `sub` and returns `ExpiresInSeconds`; no ASP.NET Identity.
@@ -166,7 +166,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ---
 
-## Phase 3 — Cache and Messaging
+## Phase 3 — Cache and Due Reminder
 
 ### Redis (Cache)
 
@@ -180,25 +180,30 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 - [x] **Redis read failure** — Treat as a cache miss and load from MongoDB.
 - [x] **docker-compose** — Redis added to the local stack and to `infra/compose/docker-compose.aws.yml`. Do not publish port `6379`. On EC2, cap Redis memory (about 64 MiB, `allkeys-lru`). API configured to use Redis when available.
 
-### RabbitMQ (Messaging)
+### Due reminder (RabbitMQ + Brevo)
 
-- [ ] **Event contracts in Application** — Events such as TaskCreated, TaskCompleted defined (DTOs or messages) in Application; no RabbitMQ types in Application.
-- [ ] **Publisher interface in Application** — e.g. `IMessagePublisher` or `IEventPublisher` with Publish method; implemented in Infrastructure.
-- [ ] **Publish on Create/Update status** — When a task is created or status set to Completed, publish corresponding event from the use case (or domain event handler) via the interface.
-- [ ] **Consumer in Infrastructure** — Consumer(s) that handle TaskCreated/TaskCompleted and persist NotificationLog (or trigger side effects); wiring in Infrastructure.
-- [ ] **docker-compose** — RabbitMQ service added; API and consumer configured to connect to RabbitMQ.
+> Design (2026-10-16, implemented): [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md). Replaces the earlier plan to publish `TaskCreated` / `TaskCompleted` and only insert a log.
+
+- [x] **DueSoon contract in Application** — One message: `TaskId`, `UserId`, `DueDate`. No RabbitMQ types in Application. `NotificationEventType` is only `DueSoon` (`TaskCreated` and `TaskCompleted` are removed).
+- [x] **Publisher interface in Application** — Implemented in Infrastructure. The API does not publish. Create, update, and status changes do not publish.
+- [x] **Scheduler host** — `TaskFlow.Scheduler` in the same solution. Every 15 minutes it publishes tasks that are not `Completed`, have a `DueDate` in `[UtcNow + 23 hours, UtcNow + 24 hours)`, and have no receipt for that task + `DueSoon` + that due instant. The scan is cross-tenant and is not a JWT-scoped repository call.
+- [x] **Notifications host** — `TaskFlow.Notifications` in the same solution. Manual ack, prefetch 1, queue `taskflow.due-soon`, dead-letter `taskflow.due-soon.dlq` after 5 failed attempts. Steps: existing receipt → ack; task missing, completed, or due instant changed → ack without mail or log; otherwise send, insert receipt, ack.
+- [x] **Brevo** — Free plan, real delivery from local Compose and from the EC2 Compose host. `IEmailSender` in Application, Brevo implementation in Infrastructure. `Brevo__ApiKey`, `Brevo__SenderEmail`, and `Brevo__SenderName` come from the environment and are not committed. Plain-text Portuguese body with the task title and the UTC due instant.
+- [x] **Compose, local and AWS** — RabbitMQ plus both workers in `docker-compose` and `infra/compose/docker-compose.aws.yml`. Do not publish AMQP `5672`. Management UI `15672` is local only. On EC2, cap RabbitMQ at 256 MiB. Workers expose `GET /health` inside the container and do not publish that port. The API does not depend on the broker.
+- [x] **EC2 deploy without ECS** — Publish `taskflow-scheduler` and `taskflow-notifications` to ECR at `github.sha`. SSM copies the updated Compose file to the existing host and pulls all three images. If `t3.micro` cannot hold the stack, set `instance_type` to `t3.small`. Do not replace the instance (the MongoDB volume lives there).
 
 ### NotificationLog (Phase 3)
 
-- [ ] **INotificationLogRepository in Application** — Interface for persisting NotificationLog entries.
-- [ ] **Implementation in Infrastructure** — MongoDB collection for NotificationLogs; repository implementation.
-- [ ] **Consumer writes NotificationLog** — When processing TaskCreated/TaskCompleted (or equivalent), consumer (or application handler) creates NotificationLog records with TaskId, EventType, ProcessedAt.
-- [ ] **Indexes** — Index on TaskId and/or ProcessedAt if needed for queries.
+- [x] **Receipt fields** — `TaskId`, `EventType` (`DueSoon`), `DueDate` (the due instant from the message), `ProcessedAt` (UTC insert time after Brevo accepts).
+- [x] **INotificationLogRepository in Application** — Exists-check and insert. Implementation in Infrastructure. No list endpoint.
+- [x] **Unique index** — `{ TaskId, EventType, DueDate }` on `NotificationLogs`. Insert happens only after Brevo accepts the mail. Duplicate key on insert is treated as already sent: ack, do not send again.
+- [x] **Task scan index** — `{ Status, DueDate }` on `Tasks`, beside the existing `UserId` and `UserId + DueDate` indexes.
 
 ### Testing (Phase 3)
 
-- [x] **Cache and messaging mocked in unit tests** — New use-case tests still mock cache and publisher; no real Redis/RabbitMQ in unit tests. Cache is mocked. Publisher tests arrive with RabbitMQ.
-- [ ] **Integration tests (optional)** — If you add integration tests for cache or messaging, they are clearly separated from unit tests and optional for local runs.
+- [x] **Cache mocked in unit tests** — Cache use-case tests mock Redis. No real Redis in unit tests.
+- [x] **Reminder unit tests mock the broker and Brevo** — Scheduler and consumer tests do not open RabbitMQ or call Brevo.
+- [ ] **Integration tests (optional)** — If you add integration tests for cache, the broker, or Brevo, they are clearly separated from unit tests and optional for local runs.
 
 ---
 
@@ -209,6 +214,6 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 | All     | Cross-Phase Standards       | Every PR / milestone  |
 | Phase 1 | MVP                         | First release         |
 | Phase 2 | CI/CD                       | GitHub Actions, ECR, Terraform/EC2 |
-| Phase 3 | Cache and Messaging         | Redis, RabbitMQ, NotificationLog |
+| Phase 3 | Cache and Due Reminder      | Redis (done); RabbitMQ, scheduler, notifications worker, Brevo, NotificationLog receipt |
 
 Mark items with `[x]` when done (e.g. `- [x] Domain has zero project references`). Re-check Cross-Phase Standards when adding new code in Phase 2 and Phase 3.

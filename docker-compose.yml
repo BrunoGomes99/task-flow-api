@@ -57,6 +57,98 @@ services:
       retries: 10
       start_period: 5s
 
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-taskflow}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-taskflow}
+    ports:
+      - "${RABBITMQ_MANAGEMENT_HOST_PORT:-15672}:15672"
+    networks:
+      - taskflow-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  taskflow.scheduler:
+    image: ${DOCKER_REGISTRY:-}taskflowscheduler
+    build:
+      context: .
+      dockerfile: src/TaskFlow.Scheduler/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      MongoDb__ConnectionString: mongodb://${MONGO_ROOT_USERNAME:-root}:${MONGO_ROOT_PASSWORD:-example}@mongo:27017/?authSource=admin
+      MongoDb__DatabaseName: TaskFlowDbDev
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: "5672"
+      RabbitMq__User: ${RABBITMQ_USER:-taskflow}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-taskflow}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - taskflow-net
+
+  taskflow.notifications:
+    image: ${DOCKER_REGISTRY:-}taskflownotifications
+    build:
+      context: .
+      dockerfile: src/TaskFlow.Notifications/Dockerfile
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_HTTP_PORTS: "8080"
+      MongoDb__ConnectionString: mongodb://${MONGO_ROOT_USERNAME:-root}:${MONGO_ROOT_PASSWORD:-example}@mongo:27017/?authSource=admin
+      MongoDb__DatabaseName: TaskFlowDbDev
+      RabbitMq__Host: rabbitmq
+      RabbitMq__Port: "5672"
+      RabbitMq__User: ${RABBITMQ_USER:-taskflow}
+      RabbitMq__Password: ${RABBITMQ_PASSWORD:-taskflow}
+      Brevo__ApiKey: ${BREVO_API_KEY:-}
+      Brevo__SenderEmail: ${BREVO_SENDER_EMAIL:-}
+      Brevo__SenderName: ${BREVO_SENDER_NAME:-TaskFlow}
+    depends_on:
+      mongo:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - taskflow-net
+
+  redis-commander:
+    image: ghcr.io/joeferner/redis-commander:0.9.1
+    restart: unless-stopped
+    user: redis
+    depends_on:
+      redis:
+        condition: service_healthy
+    ports:
+      - "${REDIS_COMMANDER_HOST_PORT:-8083}:8081"
+    environment:
+      REDIS_HOSTS: local:redis:6379
+      HTTP_USER: ${REDIS_COMMANDER_USER:-rediscommanderuser}
+      HTTP_PASSWORD: ${REDIS_COMMANDER_PASSWORD:-rediscommanderpass}
+    networks:
+      - taskflow-net
+
   mongo-express:
     image: mongo-express:1.0.2-20-alpine3.19
     restart: unless-stopped

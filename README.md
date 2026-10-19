@@ -8,7 +8,8 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 - **Tasks** — Full CRUD, paginated list (filters: title, description, status; sort by due date)
 - **Auth** — JWT (no ASP.NET Identity), BCrypt password hashing, multi-tenancy via `UserId` from token
 - **Phase 2** — GitHub Actions CI + ECR publish behind Environment `production`; Terraform AWS study stack (ECR + EC2 + Docker Compose)
-- **Phase 3 cache** — Redis Cache Aside on get-task-by-id (60 second absolute TTL). RabbitMQ events and NotificationLog persistence are still planned
+- **Phase 3 cache** — Redis Cache Aside on get-task-by-id (60 second absolute TTL)
+- **Phase 3 due reminder** — About 24 hours before `DueDate`, a scheduler worker publishes `DueSoon`; a notifications worker sends one Brevo email and stores `NotificationLog` as the receipt. Design: [docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md](docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md)
 
 ## Tech Stack
 
@@ -57,7 +58,7 @@ The API will listen on the configured port (e.g. `http://localhost:5000`).
 docker-compose up -d
 ```
 
-Starts the API, MongoDB, and Redis. Redis port `6379` is not published; the API reaches it as `redis:6379`. Health check: `GET /health`. A Redis outage does not fail get-by-id: the handler reads MongoDB.
+Starts the API, MongoDB, Redis, RabbitMQ, and the scheduler and notifications workers. Redis port `6379` and AMQP port `5672` are not published. The API reaches Redis as `redis:6379`. RabbitMQ management UI: `http://localhost:15672` (user and password from `.env`). Set `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in `.env` or the notifications worker will not stay up. Health check: `GET /health`. A Redis outage does not fail get-by-id: the handler reads MongoDB. Local Compose also starts Redis Commander at `http://localhost:8083` (basic auth from `.env`) to browse cache keys. That UI is not part of the AWS Compose file.
 
 ### Run tests
 
@@ -83,7 +84,7 @@ dotnet build TaskFlow.slnx --no-restore -c Release
 dotnet test TaskFlow.slnx --no-build -c Release
 ```
 
-AWS apply/destroy, OIDC variables, and EC2 notes: [infra/README.md](infra/README.md). Redis cache is in Phase 3; RabbitMQ and NotificationLog are still planned.
+AWS apply/destroy, OIDC variables, and EC2 notes: [infra/README.md](infra/README.md). Redis cache and the due-reminder workers are in the Compose files. The EC2 host still needs `terraform apply` (new ECR repos and secrets) before a redeploy can pull the scheduler and notifications images.
 
 ## Project Structure
 
@@ -103,7 +104,9 @@ src/
     Interfaces/              # ITaskRepository, IUserRepository, etc.
     Behaviors/               # ValidationBehavior (FluentValidation pipeline)
     Extensions/              # AddApplicationValidation, DI registration
-  TaskFlow.Infrastructure/   # MongoDB, JWT, Redis (RabbitMQ still planned)
+  TaskFlow.Infrastructure/   # MongoDB, JWT, Redis, RabbitMQ, Brevo
+  TaskFlow.Scheduler/        # Publishes DueSoon
+  TaskFlow.Notifications/    # Consumes DueSoon, sends Brevo, writes NotificationLog
   TaskFlow.Api/              # Controllers, middleware, configuration
 tests/
   TaskFlow.Domain.Tests/
@@ -121,6 +124,7 @@ tests/
 - [Engineering Guidelines](docs/ENGINEERING_GUIDELINES.md) — Implementation standards and checklists per phase  
 - [CI/CD + EC2 design](docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md) — Approved Phase 2 design (CI first; ECR + EC2 CD scaffold)
 - [Phase 3 cache design](docs/superpowers/specs/2026-10-14-phase3-cache-design.md) — Cache Aside, 60s absolute TTL, three delete retries
+- [Phase 3 due reminder design](docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md) — `DueSoon` email via Brevo, scheduler and notifications workers, EC2 Compose (not ECS)
 - [Phase 3 cache plan](docs/superpowers/plans/2026-10-14-phase3-cache.md) — Implementation notes for the Redis slice  
 - [CI/CD implementation plan](docs/superpowers/plans/2026-08-02-ci-cd-implementation.md) — Task breakdown for branch `feature/ci-cd-implementation`  
 - [Infrastructure (Terraform)](infra/README.md) — Auth, S3 state, apply/destroy, ECR publish gate, ECS evolution notes  

@@ -1,11 +1,9 @@
 namespace TaskFlow.Domain.Enums;
 
 /// <summary>
-/// Kind of notification event persisted in <see cref="Entities.NotificationLog"/>.
-/// Aligns with planned messaging events (Phase 2).
+/// Kind of notification recorded in <see cref="Entities.NotificationLog"/>.
 /// </summary>
 public enum NotificationEventType
 {
-    TaskCreated = 0,
-    TaskCompleted = 1,
+    DueSoon = 0,
 }

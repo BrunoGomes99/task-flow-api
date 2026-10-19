@@ -4,6 +4,8 @@
     <Project Path="src/TaskFlow.Application/TaskFlow.Application.csproj" />
     <Project Path="src/TaskFlow.Domain/TaskFlow.Domain.csproj" />
     <Project Path="src/TaskFlow.Infrastructure/TaskFlow.Infrastructure.csproj" />
+    <Project Path="src/TaskFlow.Notifications/TaskFlow.Notifications.csproj" />
+    <Project Path="src/TaskFlow.Scheduler/TaskFlow.Scheduler.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/TaskFlow.Application.Tests/TaskFlow.Application.Tests.csproj" />
