@@ -66,7 +66,7 @@ Starts the API, MongoDB, Redis, RabbitMQ, and the scheduler and notifications wo
 dotnet test TaskFlow.slnx
 ```
 
-Infrastructure tests use [Testcontainers](https://dotnet.testcontainers.org/) (`mongo:8.0`) and require **Docker** running locally (same requirement as GitHub Actions runners).
+Infrastructure tests use [Testcontainers](https://dotnet.testcontainers.org/) (`mongo:8.0.30`) and require **Docker** running locally (same requirement as GitHub Actions runners).
 
 ### Continuous Integration / Delivery
 
