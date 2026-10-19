@@ -37,6 +37,13 @@ public sealed class NotificationLogRepository : INotificationLogRepository
         NotificationLog log,
         CancellationToken cancellationToken = default)
     {  
-        await _notificationLogs.InsertOneAsync(NotificationLogMapper.ToDocument(log), cancellationToken: cancellationToken);
+        try
+        {
+            await _notificationLogs.InsertOneAsync(NotificationLogMapper.ToDocument(log), cancellationToken: cancellationToken);
+        }
+        catch (MongoWriteException)
+        {
+            // A duplicate receipt or another rejected write must not throw, or the consumer would requeue and send e-mail again.
+        }
     }
 }
