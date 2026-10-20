@@ -61,7 +61,7 @@ resource "aws_instance" "this" {
   user_data_replace_on_change = false
 
   root_block_device {
-    volume_size = 16
+    volume_size = 8
     volume_type = "gp3"
     encrypted   = true
   }

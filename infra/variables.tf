@@ -70,7 +70,7 @@ variable "ecr_notifications_repository_name" {
 variable "instance_type" {
   description = "EC2 instance type for the Compose host. Due reminders add RabbitMQ and two workers; use t3.small if t3.micro runs out of memory."
   type        = string
-  default     = "t3.small"
+  default     = "t3.micro"
 }
 
 variable "api_image_tag" {
