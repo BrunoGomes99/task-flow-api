@@ -4,6 +4,8 @@ using TaskFlow.Scheduler;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
+
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddDueSoonScheduler(builder.Configuration);
 builder.Services.AddHostedService<DueSoonScanHostedService>();

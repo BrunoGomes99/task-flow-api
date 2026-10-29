@@ -3,6 +3,8 @@ using TaskFlow.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
+
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddDueSoonNotifications(builder.Configuration);
 

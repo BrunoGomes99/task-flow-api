@@ -41,6 +41,7 @@
 ### Task 1: Correlate API logs
 
 **Files:**
+
 - Create: `src/TaskFlow.Api/Http/TelemetryTrace.cs`
 - Create: `src/TaskFlow.Api/Middleware/RequestLoggingMiddleware.cs`
 - Modify: `src/TaskFlow.Api/Http/ProblemDetailsExtensions.cs`
@@ -50,22 +51,23 @@
 - Modify: `src/TaskFlow.Notifications/Program.cs`
 
 **Interfaces:**
+
 - Produces: `TelemetryTrace.Current(HttpContext httpContext) -> string`
 - Produces: request log template `HTTP {Method} {Route} responded {StatusCode} in {ElapsedMilliseconds} ms` with scope property `TraceId`
 
 There is no API test project. Do not create one for this helper. `TelemetryTrace` stays `internal` to `TaskFlow.Api`.
 
-- [ ] **Step 1: Add the helper and use it everywhere the id is written**
+- [x] **Step 1: Add the helper and use it everywhere the id is written**
 
 `TelemetryTrace.Current` returns `Activity.Current.TraceId` when that id is not null and not all zeros. Otherwise it returns `httpContext.TraceIdentifier`.
 
 `ProblemDetailsExtensions.ApplyTraceId` stores that string in `extensions.traceId`. `GlobalExceptionHandler` calls `ILogger.LogError` with the exception only in the default (unexpected) branch, and includes `{TraceId}` from the same helper. Validation, argument, and unauthorized branches do not log at Error.
 
-- [ ] **Step 2: Log one line per request**
+- [x] **Step 2: Log one line per request**
 
 `RequestLoggingMiddleware` starts a scope whose `TraceId` is `TelemetryTrace.Current`. After `next`, it logs the template above at Information. `Route` is the route pattern raw text, or `HttpContext.Request.Path` when the endpoint has no pattern. Do not append the query string. Skip the request when the path is `/health`, `/health/live`, or `/health/ready`. Register the middleware in `Program.cs` before `UseExceptionHandler` so a handled exception still has a status code when the line is written. Place it so authentication failures are also logged.
 
-- [ ] **Step 3: Turn on the JSON console in all three hosts**
+- [x] **Step 3: Turn on the JSON console in all three hosts**
 
 In each `Program.cs`:
 
@@ -75,7 +77,7 @@ builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 
 Leave the existing log levels (`Default` Information, `Microsoft.AspNetCore` Warning). Do not log configuration secrets while doing this.
 
-- [ ] **Step 4: Build**
+- [x] **Step 4: Build**
 
 Run: `dotnet build TaskFlow.slnx`
 
@@ -84,6 +86,7 @@ Expected: build succeeds. `GET /health` is still the controller that returns `{ 
 ### Task 2: Liveness and readiness
 
 **Files:**
+
 - Create: `src/TaskFlow.Infrastructure/Health/TaskFlowHealthRole.cs`
 - Create: `src/TaskFlow.Infrastructure/Health/DependencyHealth.cs`
 - Create: `src/TaskFlow.Infrastructure/Health/MongoDbHealthCheck.cs`
@@ -97,6 +100,7 @@ Expected: build succeeds. `GET /health` is still the controller that returns `{ 
 - Test: `tests/TaskFlow.Infrastructure.Tests/Health/DependencyHealthTests.cs`
 
 **Interfaces:**
+
 - Produces: `enum TaskFlowHealthRole { Api, Scheduler, Notifications }`
 - Produces: `AddTaskFlowHealthChecks(this IServiceCollection services, TaskFlowHealthRole role)`
 - Produces: `DependencyHealth.Redis(Exception? error) -> HealthCheckResult` returns Healthy when `error` is null and Degraded otherwise
@@ -129,6 +133,7 @@ Expected: `DependencyHealthTests` pass and `dotnet build TaskFlow.slnx` succeeds
 ### Task 3: Reminder outcomes in logs
 
 **Files:**
+
 - Create: `src/TaskFlow.Application/UseCases/Reminders/DueSoonPublishSummary.cs`
 - Create: `src/TaskFlow.Application/UseCases/Reminders/DueSoonDeliveryResult.cs`
 - Create: `src/TaskFlow.Application/UseCases/Reminders/DueSoonDeliveryReasons.cs`
@@ -140,6 +145,7 @@ Expected: `DependencyHealthTests` pass and `dotnet build TaskFlow.slnx` succeeds
 - Test: extend `DueSoonReminderTests` rather than adding a second fixture
 
 **Interfaces:**
+
 - Produces: `readonly record struct DueSoonPublishSummary(int Published, int Skipped)`
 - Produces: `PublishAsync(...) -> Task<DueSoonPublishSummary>`
 - Produces: `readonly record struct DueSoonDeliveryResult(DueSoonDeliveryOutcome Outcome, string Reason)`
@@ -187,6 +193,7 @@ Expected: pass.
 ### Task 4: Metrics
 
 **Files:**
+
 - Create: `src/TaskFlow.Application/Observability/ReminderMetrics.cs`
 - Create: `src/TaskFlow.Infrastructure/Caching/CacheMetrics.cs`
 - Modify: `src/TaskFlow.Infrastructure/Caching/RedisTaskCache.cs`
@@ -200,6 +207,7 @@ Expected: pass.
 - Modify: `tests/TaskFlow.Infrastructure.Tests/Caching/RedisTaskCacheTests.cs` only if the constructor gains `CacheMetrics`
 
 **Interfaces:**
+
 - Produces: `ReminderMetrics` with `MeterName = "TaskFlow.Reminders"`
 - Produces: `RecordPublished(int count)`, `RecordDelivery(string reason)`, `RecordScan(TimeSpan elapsed, bool succeeded)`
 - Produces: instruments `taskflow.reminders.published` (counter), `taskflow.reminders.delivery` (counter, tag `result`), `taskflow.reminders.scan.duration` (histogram, unit seconds, tag `result` of `success` or `failure`)
@@ -232,6 +240,7 @@ Expected: pass. Do not add an OTLP exporter in this task.
 ### Task 5: Opt-in export to Grafana Cloud
 
 **Files:**
+
 - Create: `src/TaskFlow.Infrastructure/Configuration/OpenTelemetrySettings.cs`
 - Create: `src/TaskFlow.Infrastructure/Observability/OpenTelemetryRegistration.cs`
 - Create: `src/TaskFlow.Application/Behaviors/TracingBehavior.cs`
@@ -252,6 +261,7 @@ Expected: pass. Do not add an OTLP exporter in this task.
 - Do not modify: `infra/compose/docker-compose.aws.yml`, `infra/**/*.tf`
 
 **Interfaces:**
+
 - Produces: `OpenTelemetrySettings` section name `OpenTelemetry`, properties `Enabled`, `OtlpEndpoint`, `Headers`, `ServiceName`, `Environment`
 - Produces: `AddTaskFlowOpenTelemetry(this IServiceCollection services, IConfiguration configuration)`
 - Consumes: `TelemetryTrace.Current`, which already prefers `Activity.Current.TraceId`
@@ -320,6 +330,7 @@ Expected: pass. With the default configuration, no test and no host opens a conn
 ### Task 6: Mark the guidelines as the waves land
 
 **Files:**
+
 - Modify: `docs/ENGINEERING_GUIDELINES.md` checkboxes in the Phase 4 section
 
 - [ ] **Step 1: Check a box only when the task that implements it is done**

@@ -1,12 +1,13 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using MediatR;
 using TaskFlow.Api.Extensions;
 using TaskFlow.Api.Middleware;
 using TaskFlow.Application.Extensions;
 using TaskFlow.Infrastructure.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -26,6 +27,7 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseExceptionHandler();
 
 
