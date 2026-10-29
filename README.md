@@ -10,6 +10,7 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 - **Phase 2** — GitHub Actions CI + ECR publish behind Environment `production`; Terraform AWS study stack (ECR + EC2 + Docker Compose)
 - **Phase 3 cache** — Redis Cache Aside on get-task-by-id (60 second absolute TTL)
 - **Phase 3 due reminder** — About 24 hours before `DueDate`, a scheduler worker publishes `DueSoon`; a notifications worker sends one Brevo email and stores `NotificationLog` as the receipt. Design: [docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md](docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md)
+- **Phase 4 observability (approved, not implemented)** — JSON logs, liveness versus readiness, application metrics, and opt-in OpenTelemetry export to Grafana Cloud. Design: [docs/superpowers/specs/2026-10-27-phase4-observability-design.md](docs/superpowers/specs/2026-10-27-phase4-observability-design.md)
 
 ## Tech Stack
 
@@ -125,6 +126,8 @@ tests/
 - [CI/CD + EC2 design](docs/superpowers/specs/2026-08-02-ci-cd-ec2-design.md) — Approved Phase 2 design (CI first; ECR + EC2 CD scaffold)
 - [Phase 3 cache design](docs/superpowers/specs/2026-10-14-phase3-cache-design.md) — Cache Aside, 60s absolute TTL, three delete retries
 - [Phase 3 due reminder design](docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md) — `DueSoon` email via Brevo, scheduler and notifications workers, EC2 Compose (not ECS)
+- [Phase 4 observability design](docs/superpowers/specs/2026-10-27-phase4-observability-design.md) — Logs, health, metrics, and opt-in Grafana Cloud. Not on the current EC2 host
+- [Phase 4 observability plan](docs/superpowers/plans/2026-10-27-phase4-observability.md) — Implementation tasks for that design
 - [Phase 3 cache plan](docs/superpowers/plans/2026-10-14-phase3-cache.md) — Implementation notes for the Redis slice  
 - [CI/CD implementation plan](docs/superpowers/plans/2026-08-02-ci-cd-implementation.md) — Task breakdown for branch `feature/ci-cd-implementation`  
 - [Infrastructure (Terraform)](infra/README.md) — Auth, S3 state, apply/destroy, ECR publish gate, ECS evolution notes  

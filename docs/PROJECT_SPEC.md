@@ -136,6 +136,7 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 - **Ordering:** DueDate ASC/DESC.
 - Global exception-handling middleware.
 - Clear separation of concerns and logging.
+- **Observability (Phase 4):** JSON logs correlated with `traceId`, liveness versus readiness, application metrics, and opt-in OpenTelemetry export to Grafana Cloud. Not deployed on the current EC2 host. Design: [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md).
 - Appropriate HTTP status codes.
 
 ---
@@ -194,6 +195,15 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 - **Redis (done):** Cache Aside for GET task by id. Absolute TTL of 60 seconds. If deleting the cache key fails, retry up to three times, keep the MongoDB write, and let the TTL bound stale reads. Redis runs in local Compose and on the EC2 Compose host (port not published, memory capped). Design: [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md).
 - **Due reminder (implemented):** About 24 hours before `DueDate`, a scheduler worker publishes `DueSoon` to RabbitMQ. A notifications worker sends one Brevo email and stores `NotificationLog` as the receipt. Tasks with no `DueDate`, and completed tasks, are skipped. No mail on create or complete. The API does not publish or consume. Both workers run in local Compose and on the current EC2 Compose host (not ECS). If `t3.micro` runs out of memory, the instance type becomes `t3.small`. Design: [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
 
+### Phase 4 — Observability
+
+Approved, not implemented. Design: [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md). Plan: [superpowers/plans/2026-10-27-phase4-observability.md](superpowers/plans/2026-10-27-phase4-observability.md).
+
+- **Logs and health:** JSON logs on the API, scheduler, and notifications worker. One request log correlated with `ProblemDetails.extensions.traceId`. `GET /health` stays liveness for Compose and CI. `GET /health/ready` checks MongoDB (and Redis as degraded on the API; RabbitMQ on the workers). Brevo is not a readiness check.
+- **Metrics:** `System.Diagnostics.Metrics` for cache lookups and the due-reminder scan, publish, and delivery. Viewable with `dotnet-counters` before any export.
+- **Grafana Cloud:** OpenTelemetry OTLP export is off unless configured. The application does not reference a vendor SDK. Local Compose can pass the endpoint. The EC2 Compose file does not.
+- **ECS (later, not this phase):** the same OTLP application signal is forwarded by an ADOT or Alloy sidecar when Fargate replaces the EC2 host. CPU and memory of the task stay in CloudWatch. That migration also retargets liveness callers (`docker-compose`, the EC2 Compose file, CI, and the SSM curl) from `GET /health` to `GET /health/live` and removes `GET /health`. Readiness stays `GET /health/ready`.
+
 ---
 
 ## 12. Risks and Considerations
@@ -207,6 +217,8 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 
 ## 13. Document History
 
+- **2026-10-29:** Phase 4 liveness alias clarified. `GET /health` and `GET /health/live` stay equivalent in this phase, and existing curls keep `GET /health`. The ECS migration retargets those callers to `GET /health/live` and removes `GET /health`.
+- **2026-10-27:** Phase 4 observability approved, not implemented. JSON logs, liveness versus readiness, `System.Diagnostics.Metrics`, and opt-in OpenTelemetry export to Grafana Cloud. The current EC2 host stays without a collector. ECS picks up the same signal later via a sidecar. See [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md).
 - **2026-10-16:** Phase 3 messaging redefined. `NotificationLog` is the receipt for a `DueSoon` email about 24 hours before `DueDate`, sent by a notifications worker via Brevo. A scheduler worker publishes. `TaskCreated` / `TaskCompleted` publishes are dropped. ECS stays out of this phase; EC2 may move from `t3.micro` to `t3.small` if memory is short. See [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
 - **2026-10-14:** Phase 3 cache implemented: Cache Aside on `GetTaskById`, absolute 60s TTL, three delete retries, no cache-repair queue. Redis is in local Compose and in the EC2 Compose file (unpublished, memory-capped). See [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md) and [superpowers/plans/2026-10-14-phase3-cache.md](superpowers/plans/2026-10-14-phase3-cache.md).
 - **2026-08-10:** Phase 2 Terraform hardening: assume `terraform-deploy-role` + S3 remote state with `use_lockfile` (plan Task 3; former ECR/compute tasks renumbered).

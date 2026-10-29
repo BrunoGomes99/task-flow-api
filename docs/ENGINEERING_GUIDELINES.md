@@ -73,7 +73,7 @@ FluentValidation failures must translate to **400** using `ValidationProblemDeta
 ### Quality and Tooling
 
 - [ ] **SonarLint enabled** — No critical/blocker issues; address warnings as per team agreement.
-- [ ] **Logging** — Structured logging for request/response or key operations; no sensitive data (passwords, tokens) in logs.
+- [ ] **Logging** — Structured logging for request/response or key operations; no sensitive data (passwords, tokens) in logs. Phase 4 defines the shape and checks this box when the log wave lands.
 
 ---
 
@@ -207,6 +207,39 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ---
 
+## Phase 4 — Observability
+
+> Design (2026-10-27, approved, not implemented): [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md). Plan: [superpowers/plans/2026-10-27-phase4-observability.md](superpowers/plans/2026-10-27-phase4-observability.md).
+
+The application records logs, metrics, and traces. Grafana Cloud stores them when export is turned on. Domain does not reference telemetry. `TaskId` and `UserId` stay off metric tags. Passwords, tokens, API keys, email addresses, and email bodies stay out of logs.
+
+### Logs and health
+
+- [ ] **JSON console** — API, scheduler, and notifications write JSON logs with scopes included. Log levels stay `Default` Information and `Microsoft.AspNetCore` Warning.
+- [ ] **Request correlation** — One Information line per API request: method, route template, status, duration, and `TraceId`. Health routes are skipped. `ProblemDetails.extensions.traceId` is that same id (`Activity` trace id when present, otherwise `HttpContext.TraceIdentifier`).
+- [ ] **Unexpected errors logged** — `GlobalExceptionHandler` logs the exception at Error only for the unexpected branch, with that `TraceId`.
+- [ ] **Liveness unchanged in this phase** — `GET /health` and `GET /health/live` return `{ "status": "healthy" }` with HTTP 200 and do not call dependencies. Compose, CI, and the SSM curl keep `GET /health`. The ECS migration moves those callers to `GET /health/live` and removes `GET /health`.
+- [ ] **Readiness** — `GET /health/ready`. API: MongoDB unhealthy, Redis degraded. Scheduler and notifications: MongoDB and RabbitMQ unhealthy. Brevo is not checked.
+
+### Metrics
+
+- [ ] **Cache lookups** — `taskflow.cache.lookups` on meter `TaskFlow.Cache`, tag `result` of `hit`, `miss`, or `error`, recorded in `RedisTaskCache`. `ITaskCache` still returns null for a miss and for a Redis error.
+- [ ] **Reminders** — Meter `TaskFlow.Reminders`: `taskflow.reminders.published`, `taskflow.reminders.scan.duration` (seconds, tag `result` of `success` or `failure`), `taskflow.reminders.delivery` (tag `result` of `already_sent`, `skipped`, `sent`, `requeue`, `dead_letter`, `discarded`).
+- [ ] **Ack behavior unchanged** — Delivery reasons describe the existing acknowledge and requeue decisions. A finished scan logs published and skipped counts.
+
+### Export
+
+- [ ] **Off by default** — `OpenTelemetry:Enabled` is false. No OTLP exporter is registered. `infra/compose/docker-compose.aws.yml` and Terraform do not gain a collector or OTLP settings.
+- [ ] **Grafana Cloud when enabled** — OTLP to the configured endpoint. Resource attributes `service.name` (`taskflow-api`, `taskflow-scheduler`, `taskflow-notifications`) and `deployment.environment` (default `local`). `SERVICE_VERSION`, when set, becomes `service.version`.
+- [ ] **Spans** — ASP.NET Core, HttpClient, MongoDB `ActivitySource` `MongoDB.Driver` without command text, one MediatR span per request, and W3C `traceparent` on `DueSoon`. No beta Redis instrumentation package.
+- [ ] **Local switch** — `.env.example` documents empty `OTEL_ENABLED`, `OTEL_EXPORTER_OTLP_ENDPOINT`, and `OTEL_EXPORTER_OTLP_HEADERS`. Local Compose passes them through and defaults enabled to false.
+
+### Later, with ECS
+
+- [ ] **Sidecar on Fargate** — Not part of this phase. When ECS replaces the EC2 host, an ADOT or Alloy sidecar forwards the same OTLP signal to Grafana Cloud. The same migration points container and task liveness at `GET /health/live` (Compose, CI, SSM curl, and `health_url`) and removes `GET /health`. The API target group uses `GET /health/ready`. Task CPU and memory stay in CloudWatch.
+
+---
+
 ## Checklist Summary
 
 | Phase   | Focus                        | Use this section for |
@@ -215,5 +248,6 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 | Phase 1 | MVP                         | First release         |
 | Phase 2 | CI/CD                       | GitHub Actions, ECR, Terraform/EC2 |
 | Phase 3 | Cache and Due Reminder      | Redis (done); RabbitMQ, scheduler, notifications worker, Brevo, NotificationLog receipt |
+| Phase 4 | Observability               | JSON logs, live vs ready, metrics, opt-in Grafana Cloud. Not on the current EC2 host |
 
-Mark items with `[x]` when done (e.g. `- [x] Domain has zero project references`). Re-check Cross-Phase Standards when adding new code in Phase 2 and Phase 3.
+Mark items with `[x]` when done (e.g. `- [x] Domain has zero project references`). Re-check Cross-Phase Standards when adding new code in Phase 2, Phase 3, and Phase 4. The Phase 4 ECS bullet stays open until the Fargate migration.
