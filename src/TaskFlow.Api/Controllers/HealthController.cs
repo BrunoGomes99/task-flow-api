@@ -12,6 +12,7 @@ public class HealthController : ControllerBase
     /// </summary>
     [HttpGet]
     [Route("/health")]
+    [Route("/health/live")]
     [ProducesResponseType(typeof(HealthResponse), StatusCodes.Status200OK)]
     public IActionResult Get()
     {

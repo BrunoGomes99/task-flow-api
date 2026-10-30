@@ -106,7 +106,7 @@ Expected: build succeeds. `GET /health` is still the controller that returns `{ 
 - Produces: `DependencyHealth.Redis(Exception? error) -> HealthCheckResult` returns Healthy when `error` is null and Degraded otherwise
 - Produces: `DependencyHealth.Required(Exception? error, string name) -> HealthCheckResult` returns Healthy when `error` is null and Unhealthy otherwise
 
-- [ ] **Step 1: Write failing tests for the status rules**
+- [x] **Step 1: Write failing tests for the status rules**
 
 `DependencyHealthTests` asserts Redis plus an exception is `HealthStatus.Degraded`, Redis plus null is `Healthy`, and `Required` plus an exception is `Unhealthy`. No Docker.
 
@@ -114,19 +114,19 @@ Run: `dotnet test tests/TaskFlow.Infrastructure.Tests/TaskFlow.Infrastructure.Te
 
 Expected: FAIL because the type does not exist.
 
-- [ ] **Step 2: Implement the probes**
+- [x] **Step 2: Implement the probes**
 
 `MongoDbHealthCheck` pings with `IMongoClient` (`ping: 1`) and maps failures through `DependencyHealth.Required`. `RedisHealthCheck` pings `IConnectionMultiplexer` and maps failures through `DependencyHealth.Redis`. `RabbitMqHealthCheck` opens and closes a short-lived connection from `RabbitMqSettings` and maps failures through `DependencyHealth.Required`. It does not reuse the consumer channel.
 
 `AddTaskFlowHealthChecks` always adds the MongoDB check. `Api` also adds Redis. `Scheduler` and `Notifications` also add RabbitMQ. The API host calls it with `Api`. Each worker calls it with its own role.
 
-- [ ] **Step 3: Map the routes without changing liveness**
+- [x] **Step 3: Map the routes without changing liveness**
 
 On the API, `HealthController` gains `GET /health/live` with the same body as `GET /health`. `Program.cs` maps `GET /health/ready` with `MapHealthChecks`. On the workers, keep `GET /health` as the anonymous `{ status: "healthy" }` result, add the same body on `GET /health/live`, and map `GET /health/ready`.
 
 Do not point Compose healthchecks, `.github/workflows/ci.yml`, or the SSM redeploy curl at `/health/ready` or at `/health/live`. Those callers stay on `GET /health` until the ECS migration, which moves them to `GET /health/live` and removes `GET /health`.
 
-- [ ] **Step 4: Re-run the filter and build**
+- [x] **Step 4: Re-run the filter and build**
 
 Expected: `DependencyHealthTests` pass and `dotnet build TaskFlow.slnx` succeeds.
 
