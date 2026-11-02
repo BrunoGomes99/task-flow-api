@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using TaskFlow.Application.Enums;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.UseCases.Reminders;
@@ -26,10 +27,12 @@ public sealed class DueSoonReminderTests
         var publisher = new FakeDueSoonPublisher();
         var scanner = new DueSoonReminderPublish(query, logs, publisher, new FixedTimeProvider(Now));
 
-        await scanner.PublishAsync(CancellationToken.None);
+        var summary = await scanner.PublishAsync(CancellationToken.None);
 
         Assert.Equal(Now.UtcDateTime.AddHours(23), query.WindowStart);
         Assert.Equal(Now.UtcDateTime.AddHours(24), query.WindowEnd);
+        Assert.Equal(1, summary.Published);
+        Assert.Equal(1, summary.Skipped);
         var published = Assert.Single(publisher.Messages);
         Assert.Equal(fresh.Id, published.TaskId);
         Assert.Equal(fresh.UserId, published.UserId);
@@ -55,38 +58,62 @@ public sealed class DueSoonReminderTests
         var logs = new FakeNotificationLogRepository();
         logs.Seed(message.TaskId, message.DueDate);
         var email = new FakeEmailSender();
-        var delivery = Delivery(new FakeTaskReminderQuery([]), logs, email, new FakeUserRepository());
+        var logger = new RecordingLogger<DueSoonReminderDelivery>();
+        var delivery = Delivery(new FakeTaskReminderQuery([]), logs, email, new FakeUserRepository(), logger);
 
-        var outcome = await delivery.DeliverAsync(message, CancellationToken.None);
+        var result = await delivery.DeliverAsync(message, CancellationToken.None);
 
-        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, outcome);
+        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, result.Outcome);
+        Assert.Equal(DueSoonDeliveryReasons.AlreadySent, result.Reason);
+        AssertDeliveryLog(logger, message, DueSoonDeliveryReasons.AlreadySent);
         Assert.Empty(email.Sent);
         Assert.Equal(0, logs.Inserts);
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task Delivery_AcknowledgesWithoutMail_WhenTaskCompletedOrDueDateChanged()
+    public async System.Threading.Tasks.Task Delivery_AcknowledgesWithoutMail_WhenTaskMissingCompletedOrDueDateChanged()
     {
         var due = DueInWindow();
+        var (missingMessage, _) = OwnedTask(due);
         var (completedMessage, completed) = OwnedTask(due, DomainTaskStatus.Completed);
         var (movedMessage, moved) = OwnedTask(due);
         var email = new FakeEmailSender();
         var logs = new FakeNotificationLogRepository();
+        var logger = new RecordingLogger<DueSoonReminderDelivery>();
+        var movedMessageWithNewDue = movedMessage with { DueDate = due.AddHours(5) };
+
+        var missingOutcome = await Delivery(
+            new FakeTaskReminderQuery([]),
+            logs,
+            email,
+            new FakeUserRepository(),
+            logger).DeliverAsync(missingMessage, CancellationToken.None);
 
         var completedOutcome = await Delivery(
             new FakeTaskReminderQuery([], completed),
             logs,
             email,
-            new FakeUserRepository()).DeliverAsync(completedMessage, CancellationToken.None);
+            new FakeUserRepository(),
+            logger).DeliverAsync(completedMessage, CancellationToken.None);
 
         var movedOutcome = await Delivery(
             new FakeTaskReminderQuery([], moved),
             logs,
             email,
-            new FakeUserRepository()).DeliverAsync(movedMessage with { DueDate = due.AddHours(5) }, CancellationToken.None);
+            new FakeUserRepository(),
+            logger).DeliverAsync(movedMessageWithNewDue, CancellationToken.None);
 
-        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, completedOutcome);
-        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, movedOutcome);
+        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, missingOutcome.Outcome);
+        Assert.Equal(DueSoonDeliveryReasons.Skipped, missingOutcome.Reason);
+        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, completedOutcome.Outcome);
+        Assert.Equal(DueSoonDeliveryReasons.Skipped, completedOutcome.Reason);
+        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, movedOutcome.Outcome);
+        Assert.Equal(DueSoonDeliveryReasons.Skipped, movedOutcome.Reason);
+        AssertDeliveryLogs(
+            logger,
+            (missingMessage, DueSoonDeliveryReasons.Skipped),
+            (completedMessage, DueSoonDeliveryReasons.Skipped),
+            (movedMessageWithNewDue, DueSoonDeliveryReasons.Skipped));
         Assert.Empty(email.Sent);
         Assert.Equal(0, logs.Inserts);
     }
@@ -100,21 +127,31 @@ public sealed class DueSoonReminderTests
         var logs = new FakeNotificationLogRepository();
         var users = new FakeUserRepository();
         users.Seed(user);
+        var logger = new RecordingLogger<DueSoonReminderDelivery>();
 
         var missingOwner = await Delivery(
             new FakeTaskReminderQuery([], task),
             logs,
             email,
-            new FakeUserRepository()).DeliverAsync(message, CancellationToken.None);
+            new FakeUserRepository(),
+            logger).DeliverAsync(message, CancellationToken.None);
 
         var rejected = await Delivery(
             new FakeTaskReminderQuery([], task),
             logs,
             email,
-            users).DeliverAsync(message, CancellationToken.None);
+            users,
+            logger).DeliverAsync(message, CancellationToken.None);
 
-        Assert.Equal(DueSoonDeliveryOutcome.Requeue, missingOwner);
-        Assert.Equal(DueSoonDeliveryOutcome.Requeue, rejected);
+        Assert.Equal(DueSoonDeliveryOutcome.Requeue, missingOwner.Outcome);
+        Assert.Equal(DueSoonDeliveryReasons.Requeue, missingOwner.Reason);
+        Assert.Equal(DueSoonDeliveryOutcome.Requeue, rejected.Outcome);
+        Assert.Equal(DueSoonDeliveryReasons.Requeue, rejected.Reason);
+        AssertDeliveryLogs(
+            logger,
+            (message, DueSoonDeliveryReasons.Requeue),
+            (message, DueSoonDeliveryReasons.Requeue));
+        Assert.DoesNotContain(user.Email.Value, string.Join('\n', logger.Information.Select(entry => entry.Message)), StringComparison.Ordinal);
         Assert.Single(email.Sent);
         Assert.Equal(0, logs.Inserts);
     }
@@ -128,14 +165,19 @@ public sealed class DueSoonReminderTests
         users.Seed(user);
         var email = new FakeEmailSender();
         var logs = new FakeNotificationLogRepository();
+        var logger = new RecordingLogger<DueSoonReminderDelivery>();
 
         var outcome = await Delivery(
             new FakeTaskReminderQuery([], task),
             logs,
             email,
-            users).DeliverAsync(message, CancellationToken.None);
+            users,
+            logger).DeliverAsync(message, CancellationToken.None);
 
-        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, outcome);
+        Assert.Equal(DueSoonDeliveryOutcome.Acknowledge, outcome.Outcome);
+        Assert.Equal(DueSoonDeliveryReasons.Sent, outcome.Reason);
+        AssertDeliveryLog(logger, message, DueSoonDeliveryReasons.Sent);
+        Assert.DoesNotContain(user.Email.Value, logger.Information[0].Message, StringComparison.Ordinal);
         var sent = Assert.Single(email.Sent);
         Assert.Equal("ana@example.com", sent.To);
         Assert.Contains(task.Title, sent.Subject, StringComparison.Ordinal);
@@ -160,12 +202,36 @@ public sealed class DueSoonReminderTests
         return (new DueSoonMessage(task.Id, task.UserId, due), task);
     }
 
+    private static void AssertDeliveryLog(
+        RecordingLogger<DueSoonReminderDelivery> logger,
+        DueSoonMessage message,
+        string reason)
+    {
+        AssertDeliveryLogs(logger, (message, reason));
+    }
+
+    private static void AssertDeliveryLogs(
+        RecordingLogger<DueSoonReminderDelivery> logger,
+        params (DueSoonMessage Message, string Reason)[] expected)
+    {
+        Assert.Equal(expected.Length, logger.Information.Count);
+        for (var i = 0; i < expected.Length; i++)
+        {
+            var logged = logger.Information[i];
+            Assert.Equal(expected[i].Message.TaskId, logged.Values["TaskId"]);
+            Assert.Equal(DueInstant.NormalizeUtc(expected[i].Message.DueDate), logged.Values["DueDate"]);
+            Assert.Equal(expected[i].Reason, logged.Values["Result"]);
+            Assert.DoesNotContain("@", logged.Message, StringComparison.Ordinal);
+        }
+    }
+
     private static DueSoonReminderDelivery Delivery(
         FakeTaskReminderQuery tasks,
         FakeNotificationLogRepository logs,
         FakeEmailSender email,
-        FakeUserRepository users) =>
-        new(tasks, logs, users, email);
+        FakeUserRepository users,
+        RecordingLogger<DueSoonReminderDelivery> logger) =>
+        new(tasks, logs, users, email, logger);
 
     private sealed class FixedTimeProvider : TimeProvider
     {
@@ -272,5 +338,36 @@ public sealed class DueSoonReminderTests
 
         public System.Threading.Tasks.Task<bool> ExistsByEmailAsync(Domain.ValueObjects.Email email, CancellationToken cancellationToken = default) =>
             throw new NotSupportedException();
+    }
+
+    private sealed class RecordingLogger<T> : ILogger<T>
+    {
+        public List<CapturedLog> Information { get; } = [];
+
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+        public bool IsEnabled(LogLevel logLevel) => true;
+
+        public void Log<TState>(
+            LogLevel logLevel,
+            EventId eventId,
+            TState state,
+            Exception? exception,
+            Func<TState, Exception?, string> formatter)
+        {
+            if (logLevel != LogLevel.Information || state is not System.Collections.IEnumerable items)
+                return;
+
+            var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var item in items)
+            {
+                if (item is KeyValuePair<string, object> pair && pair.Key != "{OriginalFormat}")
+                    values[pair.Key] = pair.Value;
+            }
+
+            Information.Add(new CapturedLog(formatter(state, exception), values));
+        }
+
+        public readonly record struct CapturedLog(string Message, IReadOnlyDictionary<string, object?> Values);
     }
 }

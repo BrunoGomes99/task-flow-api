@@ -85,8 +85,8 @@ public sealed class DueSoonConsumer : BackgroundService
         {
             await using var scope = _scopes.CreateAsyncScope();
             var handler = scope.ServiceProvider.GetRequiredService<DueSoonReminderDelivery>();
-            var outcome = await handler.DeliverAsync(message, stoppingToken);
-            if (outcome == DueSoonDeliveryOutcome.Acknowledge)
+            var result = await handler.DeliverAsync(message, stoppingToken);
+            if (result.Outcome == DueSoonDeliveryOutcome.Acknowledge)
             {
                 await AckAsync(channel, gate, delivery.DeliveryTag, stoppingToken);
                 return;

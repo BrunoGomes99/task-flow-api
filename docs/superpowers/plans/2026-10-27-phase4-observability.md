@@ -28,9 +28,9 @@
 | `src/TaskFlow.Api/Http/TelemetryTrace.cs` | One `traceId` string for `ProblemDetails`, the request log, and the exception log |
 | `src/TaskFlow.Api/Middleware/RequestLoggingMiddleware.cs` | One Information line per API request, skipping health routes |
 | `src/TaskFlow.Infrastructure/Health/*` | MongoDB, Redis, and RabbitMQ probes and the status rules |
-| `src/TaskFlow.Application/UseCases/Reminders/DueSoonPublishSummary.cs` | Published and skipped counts for one finished scan |
-| `src/TaskFlow.Application/UseCases/Reminders/DueSoonDeliveryResult.cs` | Broker outcome plus a stable reason string |
-| `src/TaskFlow.Application/UseCases/Reminders/DueSoonDeliveryReasons.cs` | The six reason constants |
+| `src/TaskFlow.Application/UseCases/Reminders/PublishDueSoonReminders/DueSoonPublishSummary.cs` | Published and skipped counts for one finished scan |
+| `src/TaskFlow.Application/UseCases/Reminders/DeliverDueSoonReminder/DueSoonDeliveryResult.cs` | Broker outcome plus a stable reason string |
+| `src/TaskFlow.Application/UseCases/Reminders/DeliverDueSoonReminder/DueSoonDeliveryReasons.cs` | The six reason constants |
 | `src/TaskFlow.Application/Observability/ReminderMetrics.cs` | Published counter, delivery counter, scan histogram |
 | `src/TaskFlow.Infrastructure/Caching/CacheMetrics.cs` | Cache lookup counter |
 | `src/TaskFlow.Infrastructure/Observability/OpenTelemetryRegistration.cs` | Opt-in SDK and OTLP exporter |
@@ -134,9 +134,9 @@ Expected: `DependencyHealthTests` pass and `dotnet build TaskFlow.slnx` succeeds
 
 **Files:**
 
-- Create: `src/TaskFlow.Application/UseCases/Reminders/DueSoonPublishSummary.cs`
-- Create: `src/TaskFlow.Application/UseCases/Reminders/DueSoonDeliveryResult.cs`
-- Create: `src/TaskFlow.Application/UseCases/Reminders/DueSoonDeliveryReasons.cs`
+- Create: `src/TaskFlow.Application/UseCases/Reminders/PublishDueSoonReminders/DueSoonPublishSummary.cs`
+- Create: `src/TaskFlow.Application/UseCases/Reminders/DeliverDueSoonReminder/DueSoonDeliveryResult.cs`
+- Create: `src/TaskFlow.Application/UseCases/Reminders/DeliverDueSoonReminder/DueSoonDeliveryReasons.cs`
 - Modify: `src/TaskFlow.Application/UseCases/Reminders/PublishDueSoonReminders/DueSoonReminderPublish.cs`
 - Modify: `src/TaskFlow.Application/UseCases/Reminders/DeliverDueSoonReminder/DueSoonReminderDelivery.cs`
 - Modify: `src/TaskFlow.Scheduler/DueSoonScanHostedService.cs`
@@ -153,7 +153,7 @@ Expected: `DependencyHealthTests` pass and `dotnet build TaskFlow.slnx` succeeds
 - Produces: `DueSoonDeliveryReasons` constants `already_sent`, `skipped`, `sent`, `requeue`, `dead_letter`, `discarded`
 - Consumes: existing `DueSoonDeliveryOutcome.Acknowledge` and `Requeue`
 
-- [ ] **Step 1: Update the existing reminder tests so they fail to compile against the new results**
+- [x] **Step 1: Update the existing reminder tests so they fail to compile against the new results**
 
 Assertions to lock:
 
@@ -168,13 +168,13 @@ Run: `dotnet test tests/TaskFlow.Application.Tests/TaskFlow.Application.Tests.cs
 
 Expected: FAIL to compile or fail assertions.
 
-- [ ] **Step 2: Return the summary and the result without changing broker decisions**
+- [x] **Step 2: Return the summary and the result without changing broker decisions**
 
 `PublishAsync` counts a skipped receipt before `continue`, and a published message after `PublishAsync` on the publisher returns. An exception from the publisher still propagates.
 
 `DeliverAsync` maps today's branches onto the reasons above. `CanRemind` false is `skipped`. Do not send mail on `already_sent` or `skipped`.
 
-- [ ] **Step 3: Log the summary and the reason**
+- [x] **Step 3: Log the summary and the reason**
 
 `DueSoonScanHostedService` logs, at Information, when the scan returns:
 
@@ -186,7 +186,7 @@ The existing Error log on a thrown scan stays.
 
 `DueSoonConsumer` reads `result.Outcome` the same way it read the old enum. Unreadable body and empty identity stay Error logs. They do not get a new broker path in this task.
 
-- [ ] **Step 4: Re-run `DueSoonReminderTests` and the solution build**
+- [x] **Step 4: Re-run `DueSoonReminderTests` and the solution build**
 
 Expected: pass.
 

@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using TaskFlow.Application.UseCases.Reminders.PublishDueSoonReminders;
 
 namespace TaskFlow.Scheduler;
@@ -28,9 +29,16 @@ public sealed class DueSoonScanHostedService : BackgroundService
     {
         try
         {
+            var stopwatch = Stopwatch.StartNew();
             await using var scope = _scopes.CreateAsyncScope();
             var scanner = scope.ServiceProvider.GetRequiredService<DueSoonReminderPublish>();
-            await scanner.PublishAsync(cancellationToken);
+            var summary = await scanner.PublishAsync(cancellationToken);
+            stopwatch.Stop();
+            _logger.LogInformation(
+                "DueSoon scan published {Published} reminders and skipped {Skipped} in {ElapsedMilliseconds} ms",
+                summary.Published,
+                summary.Skipped,
+                stopwatch.ElapsedMilliseconds);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
