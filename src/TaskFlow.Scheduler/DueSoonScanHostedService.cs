@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using TaskFlow.Application.Observability;
 using TaskFlow.Application.UseCases.Reminders.PublishDueSoonReminders;
 
 namespace TaskFlow.Scheduler;
@@ -9,11 +10,16 @@ public sealed class DueSoonScanHostedService : BackgroundService
 
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<DueSoonScanHostedService> _logger;
+    private readonly ReminderMetrics _metrics;
 
-    public DueSoonScanHostedService(IServiceScopeFactory scopes, ILogger<DueSoonScanHostedService> logger)
+    public DueSoonScanHostedService(
+        IServiceScopeFactory scopes,
+        ILogger<DueSoonScanHostedService> logger,
+        ReminderMetrics metrics)
     {
         _scopes = scopes;
         _logger = logger;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -27,9 +33,9 @@ public sealed class DueSoonScanHostedService : BackgroundService
 
     private async Task ScanAsync(CancellationToken cancellationToken)
     {
+        var stopwatch = Stopwatch.StartNew();
         try
         {
-            var stopwatch = Stopwatch.StartNew();
             await using var scope = _scopes.CreateAsyncScope();
             var scanner = scope.ServiceProvider.GetRequiredService<DueSoonReminderPublish>();
             var summary = await scanner.PublishAsync(cancellationToken);
@@ -39,10 +45,14 @@ public sealed class DueSoonScanHostedService : BackgroundService
                 summary.Published,
                 summary.Skipped,
                 stopwatch.ElapsedMilliseconds);
+            _metrics.RecordPublished(summary.Published);
+            _metrics.RecordScan(stopwatch.Elapsed, succeeded: true);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            stopwatch.Stop();
             _logger.LogError(ex, "DueSoon scan failed");
+            _metrics.RecordScan(stopwatch.Elapsed, succeeded: false);
         }
     }
 }

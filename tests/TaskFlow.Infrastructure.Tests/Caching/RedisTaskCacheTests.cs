@@ -11,7 +11,8 @@ public sealed class RedisTaskCacheTests
     public async Task SetAndGet_ShouldUseUserAndTaskKey_WithAbsoluteTtlOf60Seconds()
     {
         var store = new RecordingRedisStringCache();
-        var cache = new RedisTaskCache(store, NullLogger<RedisTaskCache>.Instance);
+        using var metrics = new CacheMetrics();
+        var cache = new RedisTaskCache(store, NullLogger<RedisTaskCache>.Instance, metrics);
         var userId = Guid.Parse("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         var taskId = Guid.Parse("11111111-2222-3333-4444-555555555555");
         var createdAt = new DateTime(2026, 10, 14, 15, 0, 0, DateTimeKind.Utc);
@@ -33,7 +34,8 @@ public sealed class RedisTaskCacheTests
     public async Task Get_ShouldReturnNull_WhenStoreThrows()
     {
         var store = new RecordingRedisStringCache { GetException = new InvalidOperationException("redis down") };
-        var cache = new RedisTaskCache(store, NullLogger<RedisTaskCache>.Instance);
+        using var metrics = new CacheMetrics();
+        var cache = new RedisTaskCache(store, NullLogger<RedisTaskCache>.Instance, metrics);
 
         var loaded = await cache.GetAsync(Guid.NewGuid(), Guid.NewGuid(), CancellationToken.None);
 
@@ -44,7 +46,8 @@ public sealed class RedisTaskCacheTests
     public async Task Set_ShouldSwallowStoreExceptions()
     {
         var store = new RecordingRedisStringCache { SetException = new InvalidOperationException("redis down") };
-        var cache = new RedisTaskCache(store, NullLogger<RedisTaskCache>.Instance);
+        using var metrics = new CacheMetrics();
+        var cache = new RedisTaskCache(store, NullLogger<RedisTaskCache>.Instance, metrics);
         var dto = new TaskDto(Guid.NewGuid(), "Title", "", DomainTaskStatus.Pending, null, DateTime.UtcNow, DateTime.UtcNow);
 
         var act = () => cache.SetAsync(Guid.NewGuid(), dto.Id, dto, CancellationToken.None);
@@ -56,8 +59,10 @@ public sealed class RedisTaskCacheTests
     public async Task Remove_ShouldReturnFalse_WhenStoreThrows_AndTrueWhenDeleteCompletes()
     {
         var failing = new RecordingRedisStringCache { DeleteException = new InvalidOperationException("redis down") };
-        var failingCache = new RedisTaskCache(failing, NullLogger<RedisTaskCache>.Instance);
-        var healthy = new RedisTaskCache(new RecordingRedisStringCache(), NullLogger<RedisTaskCache>.Instance);
+        using var failingMetrics = new CacheMetrics();
+        using var healthyMetrics = new CacheMetrics();
+        var failingCache = new RedisTaskCache(failing, NullLogger<RedisTaskCache>.Instance, failingMetrics);
+        var healthy = new RedisTaskCache(new RecordingRedisStringCache(), NullLogger<RedisTaskCache>.Instance, healthyMetrics);
         var userId = Guid.NewGuid();
         var taskId = Guid.NewGuid();
 

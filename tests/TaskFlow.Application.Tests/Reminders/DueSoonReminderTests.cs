@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TaskFlow.Application.Enums;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Application.Observability;
 using TaskFlow.Application.UseCases.Reminders;
 using TaskFlow.Application.UseCases.Reminders.DeliverDueSoonReminder;
 using TaskFlow.Application.UseCases.Reminders.PublishDueSoonReminders;
@@ -14,6 +15,7 @@ namespace TaskFlow.Application.Tests.Reminders;
 public sealed class DueSoonReminderTests
 {
     private static readonly DateTimeOffset Now = new(2026, 10, 16, 15, 0, 0, TimeSpan.Zero);
+    private static readonly ReminderMetrics Metrics = new();
 
     [Fact]
     public async System.Threading.Tasks.Task Scanner_PublishesTasksInWindow_AndSkipsExistingReceipt()
@@ -231,7 +233,7 @@ public sealed class DueSoonReminderTests
         FakeEmailSender email,
         FakeUserRepository users,
         RecordingLogger<DueSoonReminderDelivery> logger) =>
-        new(tasks, logs, users, email, logger);
+        new(tasks, logs, users, email, logger, Metrics);
 
     private sealed class FixedTimeProvider : TimeProvider
     {

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
 using TaskFlow.Application.Enums;
+using TaskFlow.Application.Observability;
 using TaskFlow.Application.UseCases.Reminders;
 using TaskFlow.Application.UseCases.Reminders.DeliverDueSoonReminder;
 using TaskFlow.Infrastructure.Configuration;
@@ -18,15 +19,18 @@ public sealed class DueSoonConsumer : BackgroundService
     private readonly RabbitMqSettings _settings;
     private readonly IServiceScopeFactory _scopes;
     private readonly ILogger<DueSoonConsumer> _logger;
+    private readonly ReminderMetrics _metrics;
 
     public DueSoonConsumer(
         RabbitMqSettings settings,
         IServiceScopeFactory scopes,
-        ILogger<DueSoonConsumer> logger)
+        ILogger<DueSoonConsumer> logger,
+        ReminderMetrics metrics)
     {
         _settings = settings;
         _scopes = scopes;
         _logger = logger;
+        _metrics = metrics;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -70,6 +74,7 @@ public sealed class DueSoonConsumer : BackgroundService
         catch (JsonException ex)
         {
             _logger.LogError(ex, "Discarding DueSoon message {DeliveryTag} with an unreadable body", delivery.DeliveryTag);
+            _metrics.RecordDelivery(DueSoonDeliveryReasons.Discarded);
             await NackAsync(channel, gate, delivery.DeliveryTag, requeue: false, stoppingToken);
             return;
         }
@@ -77,6 +82,7 @@ public sealed class DueSoonConsumer : BackgroundService
         if (message is null || message.TaskId == Guid.Empty || message.UserId == Guid.Empty)
         {
             _logger.LogError("Discarding DueSoon message {DeliveryTag} with an empty identity", delivery.DeliveryTag);
+            _metrics.RecordDelivery(DueSoonDeliveryReasons.Discarded);
             await NackAsync(channel, gate, delivery.DeliveryTag, requeue: false, stoppingToken);
             return;
         }
@@ -104,6 +110,7 @@ public sealed class DueSoonConsumer : BackgroundService
                 "DueSoon for task {TaskId} failed {Attempt} times and is dead-lettered",
                 message.TaskId,
                 attempt);
+            _metrics.RecordDelivery(DueSoonDeliveryReasons.DeadLetter);
             await NackAsync(channel, gate, delivery.DeliveryTag, requeue: false, stoppingToken);
             return;
         }

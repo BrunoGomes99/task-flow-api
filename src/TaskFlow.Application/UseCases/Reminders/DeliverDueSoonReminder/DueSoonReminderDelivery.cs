@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Logging;
 using TaskFlow.Application.Enums;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Application.Observability;
 using TaskFlow.Domain.Entities;
 using TaskFlow.Domain.Enums;
 using DomainTaskStatus = TaskFlow.Domain.Enums.TaskStatus;
@@ -17,19 +18,22 @@ public sealed class DueSoonReminderDelivery
     private readonly IUserRepository _users;
     private readonly IEmailSender _email;
     private readonly ILogger<DueSoonReminderDelivery> _logger;
+    private readonly ReminderMetrics _metrics;
 
     public DueSoonReminderDelivery(
         ITaskReminderRepository tasks,
         INotificationLogRepository notificationLogs,
         IUserRepository users,
         IEmailSender email,
-        ILogger<DueSoonReminderDelivery> logger)
+        ILogger<DueSoonReminderDelivery> logger,
+        ReminderMetrics metrics)
     {
         _tasks = tasks;
         _notificationLogs = notificationLogs;
         _users = users;
         _email = email;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<DueSoonDeliveryResult> DeliverAsync(
@@ -70,6 +74,7 @@ public sealed class DueSoonReminderDelivery
                 message.TaskId,
                 due,
                 reason);
+            _metrics.RecordDelivery(reason);
             return new DueSoonDeliveryResult(outcome, reason);
         }
     }

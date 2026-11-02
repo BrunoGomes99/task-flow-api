@@ -214,7 +214,7 @@ Expected: pass.
 - Produces: `CacheMetrics` with `MeterName = "TaskFlow.Cache"` and counter `taskflow.cache.lookups`, tag `result` of `hit`, `miss`, or `error`
 - Consumes: `DueSoonDeliveryReasons`
 
-- [ ] **Step 1: Write failing meter tests**
+- [x] **Step 1: Write failing meter tests**
 
 Use `MeterListener` on the meter name. Assert:
 
@@ -225,7 +225,7 @@ Use `MeterListener` on the meter name. Assert:
 
 Run the two new filters. Expected: FAIL because the types do not exist.
 
-- [ ] **Step 2: Implement the meters and call them**
+- [x] **Step 2: Implement the meters and call them**
 
 Register `ReminderMetrics` as a singleton from both `AddDueSoonScheduler` and `AddDueSoonNotifications`. Register `CacheMetrics` as a singleton from `AddInfrastructure`.
 
@@ -233,7 +233,7 @@ Register `ReminderMetrics` as a singleton from both `AddDueSoonScheduler` and `A
 
 The hosted service calls `RecordPublished(summary.Published)` and `RecordScan(..., succeeded: true)` after a finished scan, and `RecordScan(..., succeeded: false)` in the existing catch. `DueSoonReminderDelivery` calls `RecordDelivery` with its reason. The consumer calls `RecordDelivery(discarded)` when it nacks an unreadable or empty message, and `RecordDelivery(dead_letter)` on the existing dead-letter branch.
 
-- [ ] **Step 3: Re-run the new filters, `DueSoonReminderTests`, and `RedisTaskCacheTests`**
+- [x] **Step 3: Re-run the new filters, `DueSoonReminderTests`, and `RedisTaskCacheTests`**
 
 Expected: pass. Do not add an OTLP exporter in this task.
 
