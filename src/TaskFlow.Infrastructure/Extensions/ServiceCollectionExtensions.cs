@@ -58,6 +58,7 @@ public static class ServiceCollectionExtensions
             options.AbortOnConnectFail = false;
             return ConnectionMultiplexer.Connect(options);
         });
+        services.AddSingleton<CacheMetrics>();
         services.AddSingleton<IRedisStringCache, RedisStringCache>();
         services.AddSingleton<ITaskCache, RedisTaskCache>();
 

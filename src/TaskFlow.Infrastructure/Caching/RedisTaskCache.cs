@@ -17,11 +17,13 @@ public sealed class RedisTaskCache : ITaskCache
 
     private readonly IRedisStringCache _store;
     private readonly ILogger<RedisTaskCache> _logger;
+    private readonly CacheMetrics _metrics;
 
-    public RedisTaskCache(IRedisStringCache store, ILogger<RedisTaskCache> logger)
+    public RedisTaskCache(IRedisStringCache store, ILogger<RedisTaskCache> logger, CacheMetrics metrics)
     {
         _store = store;
         _logger = logger;
+        _metrics = metrics;
     }
 
     public async Task<TaskDto?> GetAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
@@ -30,9 +32,14 @@ public sealed class RedisTaskCache : ITaskCache
         {
             var json = await _store.GetAsync(CacheKey(userId, taskId), cancellationToken);
             if (string.IsNullOrWhiteSpace(json))
+            {
+                _metrics.RecordMiss();
                 return null;
+            }
 
-            return JsonSerializer.Deserialize<TaskDto>(json, JsonOptions);
+            var task = JsonSerializer.Deserialize<TaskDto>(json, JsonOptions);
+            _metrics.RecordHit();
+            return task;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -45,6 +52,7 @@ public sealed class RedisTaskCache : ITaskCache
                 "Task cache read failed. UserId={UserId} TaskId={TaskId}",
                 userId,
                 taskId);
+            _metrics.RecordError();
             return null;
         }
     }

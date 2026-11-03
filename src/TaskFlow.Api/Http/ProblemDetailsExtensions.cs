@@ -10,7 +10,7 @@ internal static class ProblemDetailsExtensions
         ArgumentNullException.ThrowIfNull(problem);
         ArgumentNullException.ThrowIfNull(httpContext);
 
-        problem.Extensions["traceId"] = httpContext.TraceIdentifier;
+        problem.Extensions["traceId"] = TelemetryTrace.Current(httpContext);
     }
 
     public static void ApplyErrorCode(this ProblemDetails problem, string code)

@@ -25,11 +25,13 @@ public sealed class DueSoonReminderPublish
         _time = time;
     }
 
-    public async Task PublishAsync(CancellationToken cancellationToken = default)
+    public async Task<DueSoonPublishSummary> PublishAsync(CancellationToken cancellationToken = default)
     {
         var now = DueInstant.NormalizeUtc(_time.GetUtcNow().UtcDateTime);
         var windowStart = now.AddHours(23);
         var windowEnd = now.AddHours(24);
+        var published = 0;
+        var skipped = 0;
 
         var candidates = await _tasks.ListInWindowAsync(windowStart, windowEnd, cancellationToken);
         foreach (var candidate in candidates)
@@ -42,11 +44,17 @@ public sealed class DueSoonReminderPublish
                 cancellationToken);
 
             if (alreadySent)
+            {
+                skipped++;
                 continue;
+            }
 
             await _publisher.PublishAsync(
                 new DueSoonMessage(candidate.Id, candidate.UserId, due),
                 cancellationToken);
+            published++;
         }
+
+        return new DueSoonPublishSummary(published, skipped);
     }
 }

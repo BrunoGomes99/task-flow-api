@@ -16,7 +16,7 @@ This design applies to:
 
 - Replace FluentValidation behavior (validation still maps to HTTP 400).
 - Change routing conventions or add refresh-token flows.
-- Add full telemetry stack (only prepare contract fields such as `traceId`).
+- Add full telemetry stack (only prepare contract fields such as `traceId`). Phase 4 owns that stack: [2026-10-27-phase4-observability-design.md](2026-10-27-phase4-observability-design.md). `extensions.traceId` stays the single correlation field.
 
 ## Decisions (Approved)
 

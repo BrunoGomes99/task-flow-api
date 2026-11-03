@@ -78,7 +78,8 @@ Documented only in this cycle:
 - Later: ECS task definition + Fargate service + ALB  
 - Move Mongo off the EC2 host to a managed store when adopting ECS  
 - **Remove** the temporary SSM Compose redeploy path (GitHub job + `AmazonSSMManagedInstanceCore` / `TaskFlowRedeploy` tag) when ECS lands  
-- **Image identity:** bootstrap may still use `:latest` on first EC2 boot; SSM redeploy and future ECS **must** pin `github.sha` (or digest)—not `:latest`—as the running identity. `:latest` may stay as an optional ECR convenience tag only. 
+- **Image identity:** bootstrap may still use `:latest` on first EC2 boot; SSM redeploy and future ECS **must** pin `github.sha` (or digest)—not `:latest`—as the running identity. `:latest` may stay as an optional ECR convenience tag only.
+- **Observability:** this EC2 host does not run a collector. When ECS lands, task definitions forward the same OpenTelemetry signal to Grafana Cloud, as specified in [2026-10-27-phase4-observability-design.md](2026-10-27-phase4-observability-design.md). The same migration points liveness curls at `GET /health/live` and removes `GET /health`. 
 
 ### D9 — Terraform auth + remote state (study hardening)
 

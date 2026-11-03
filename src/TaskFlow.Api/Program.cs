@@ -1,12 +1,15 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using MediatR;
 using TaskFlow.Api.Extensions;
 using TaskFlow.Api.Middleware;
 using TaskFlow.Application.Extensions;
 using TaskFlow.Infrastructure.Extensions;
+using TaskFlow.Infrastructure.Health;
+using TaskFlow.Infrastructure.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
@@ -19,6 +22,8 @@ builder.Services.AddTaskFlowJwtAuthentication(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(TaskFlow.Application.UseCases.Tasks.CreateTask.CreateTaskCommand).Assembly));
 builder.Services.AddApplicationValidation();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddTaskFlowOpenTelemetry(builder.Configuration);
+builder.Services.AddTaskFlowHealthChecks(TaskFlowHealthRole.Api);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddTaskFlowSwagger();
 builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
@@ -26,6 +31,7 @@ builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
+app.UseMiddleware<RequestLoggingMiddleware>();
 app.UseExceptionHandler();
 
 
@@ -48,6 +54,7 @@ if (!app.Environment.IsDevelopment())
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
+app.MapHealthChecks("/health/ready");
 
 using (var scope = app.Services.CreateScope())
 {

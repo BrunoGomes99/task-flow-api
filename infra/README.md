@@ -212,6 +212,8 @@ Keep building the **same** API image into ECR. Later:
 - Move MongoDB off the app host to a managed store (or a dedicated data host).
 - **Remove** the SSM redeploy job; wire the GitHub `production` gate to an ECS **`update-service`** (or new task definition) instead.
 - Drop `AmazonSSMManagedInstanceCore` / `TaskFlowRedeploy` when the EC2 host is gone.
+- Forward application telemetry with an ADOT or Alloy sidecar to Grafana Cloud. The app already speaks OpenTelemetry; the EC2 Compose file does not run a collector. See [the Phase 4 observability design](../docs/superpowers/specs/2026-10-27-phase4-observability-design.md).
+- Point liveness at `GET /health/live` and remove `GET /health`. That includes this file's `health_url`, both Compose healthchecks, the CI curl, and the SSM redeploy curl. The API target group uses `GET /health/ready`.
 
 ### Image tags: bootstrap `latest`; redeploy and ECS pin SHA
 

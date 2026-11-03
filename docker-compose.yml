@@ -9,6 +9,9 @@ services:
       ASPNETCORE_HTTP_PORTS: "8080"
       MongoDb__ConnectionString: mongodb://${MONGO_ROOT_USERNAME:-root}:${MONGO_ROOT_PASSWORD:-example}@mongo:27017/?authSource=admin
       Redis__ConnectionString: redis:6379,abortConnect=false
+      OpenTelemetry__Enabled: ${OTEL_ENABLED:-false}
+      OpenTelemetry__OtlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OpenTelemetry__Headers: ${OTEL_EXPORTER_OTLP_HEADERS:-}
     depends_on:
       mongo:
         condition: service_healthy
@@ -88,6 +91,9 @@ services:
       RabbitMq__Port: "5672"
       RabbitMq__User: ${RABBITMQ_USER:-taskflow}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-taskflow}
+      OpenTelemetry__Enabled: ${OTEL_ENABLED:-false}
+      OpenTelemetry__OtlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OpenTelemetry__Headers: ${OTEL_EXPORTER_OTLP_HEADERS:-}
     depends_on:
       mongo:
         condition: service_healthy
@@ -116,6 +122,9 @@ services:
       RabbitMq__Port: "5672"
       RabbitMq__User: ${RABBITMQ_USER:-taskflow}
       RabbitMq__Password: ${RABBITMQ_PASSWORD:-taskflow}
+      OpenTelemetry__Enabled: ${OTEL_ENABLED:-false}
+      OpenTelemetry__OtlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
+      OpenTelemetry__Headers: ${OTEL_EXPORTER_OTLP_HEADERS:-}
       Brevo__ApiKey: ${BREVO_API_KEY:-}
       Brevo__SenderEmail: ${BREVO_SENDER_EMAIL:-}
       Brevo__SenderName: ${BREVO_SENDER_NAME:-TaskFlow}

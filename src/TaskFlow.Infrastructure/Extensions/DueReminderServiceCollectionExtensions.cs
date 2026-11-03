@@ -1,6 +1,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using TaskFlow.Application.Interfaces;
+using TaskFlow.Application.Observability;
 using TaskFlow.Application.UseCases.Reminders.DeliverDueSoonReminder;
 using TaskFlow.Application.UseCases.Reminders.PublishDueSoonReminders;
 using TaskFlow.Infrastructure.Configuration;
@@ -18,6 +19,7 @@ public static class DueReminderServiceCollectionExtensions
 
         services.AddSingleton(RequireRabbitMq(configuration));
         services.AddSingleton(TimeProvider.System);
+        services.AddSingleton<ReminderMetrics>();
         services.AddScoped<DueSoonReminderPublish>();
         services.AddSingleton<IDueSoonPublisher, DueSoonPublisher>();
         return services;
@@ -29,6 +31,7 @@ public static class DueReminderServiceCollectionExtensions
         ArgumentNullException.ThrowIfNull(configuration);
 
         services.AddSingleton(RequireRabbitMq(configuration));
+        services.AddSingleton<ReminderMetrics>();
         services.AddScoped<DueSoonReminderDelivery>();
 
         var brevo = configuration.GetSection(BrevoSettings.SectionName).Get<BrevoSettings>() ?? new BrevoSettings();

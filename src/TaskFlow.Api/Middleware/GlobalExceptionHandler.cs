@@ -5,7 +5,9 @@ using TaskFlow.Api.Http;
 using TaskFlow.Application.Common.Results;
 namespace TaskFlow.Api.Middleware;
 
-public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExceptionHandler
+public sealed class GlobalExceptionHandler(
+    IHostEnvironment environment,
+    ILogger<GlobalExceptionHandler> logger) : IExceptionHandler
 {
     public async ValueTask<bool> TryHandleAsync(
         HttpContext httpContext,
@@ -15,7 +17,7 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
         ArgumentNullException.ThrowIfNull(httpContext);
         ArgumentNullException.ThrowIfNull(exception);
 
-        var (statusCode, problem) = MapException(exception, environment, httpContext);
+        var (statusCode, problem) = MapException(exception, environment, httpContext, logger);
 
         httpContext.Response.StatusCode = statusCode;
         await httpContext.Response.WriteAsJsonAsync(problem, cancellationToken).ConfigureAwait(false);
@@ -26,7 +28,8 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
     private static (int StatusCode, object Problem) MapException(
         Exception exception,
         IHostEnvironment environment,
-        HttpContext httpContext)
+        HttpContext httpContext,
+        ILogger logger)
     {
         switch (exception)
         {
@@ -78,6 +81,11 @@ public sealed class GlobalExceptionHandler(IHostEnvironment environment) : IExce
 
             default:
             {
+                logger.LogError(
+                    exception,
+                    "Unexpected exception {TraceId}",
+                    TelemetryTrace.Current(httpContext));
+
                 var problem = new ProblemDetails
                 {
                     Title = "Server error",
