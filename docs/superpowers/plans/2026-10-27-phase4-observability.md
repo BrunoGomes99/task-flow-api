@@ -186,7 +186,7 @@ The existing Error log on a thrown scan stays.
 
 `DueSoonConsumer` reads `result.Outcome` the same way it read the old enum. Unreadable body and empty identity stay Error logs. They do not get a new broker path in this task.
 
-- [x] **Step 4: Re-run `DueSoonReminderTests` and the solution build**
+- [x] **Step 4: Re-run** `DueSoonReminderTests` **and the solution build**
 
 Expected: pass.
 
@@ -233,7 +233,7 @@ Register `ReminderMetrics` as a singleton from both `AddDueSoonScheduler` and `A
 
 The hosted service calls `RecordPublished(summary.Published)` and `RecordScan(..., succeeded: true)` after a finished scan, and `RecordScan(..., succeeded: false)` in the existing catch. `DueSoonReminderDelivery` calls `RecordDelivery` with its reason. The consumer calls `RecordDelivery(discarded)` when it nacks an unreadable or empty message, and `RecordDelivery(dead_letter)` on the existing dead-letter branch.
 
-- [x] **Step 3: Re-run the new filters, `DueSoonReminderTests`, and `RedisTaskCacheTests`**
+- [x] **Step 3: Re-run the new filters,** `DueSoonReminderTests`**, and** `RedisTaskCacheTests`
 
 Expected: pass. Do not add an OTLP exporter in this task.
 
@@ -266,7 +266,7 @@ Expected: pass. Do not add an OTLP exporter in this task.
 - Produces: `AddTaskFlowOpenTelemetry(this IServiceCollection services, IConfiguration configuration)`
 - Consumes: `TelemetryTrace.Current`, which already prefers `Activity.Current.TraceId`
 
-- [ ] **Step 1: Write failing configuration tests**
+- [x] **Step 1: Write failing configuration tests**
 
 `Enabled=false` does not register an OTLP exporter (resolve the service collection and assert no `TracerProvider` / exporter registration; do not open a socket). `Enabled=true` with an empty `OtlpEndpoint` throws `InvalidOperationException` at registration. `Enabled=true` with an endpoint registers the SDK. Assert `Headers` is not written by any log in this test.
 
@@ -274,7 +274,7 @@ Run: `dotnet test tests/TaskFlow.Infrastructure.Tests/TaskFlow.Infrastructure.Te
 
 Expected: FAIL because the type does not exist.
 
-- [ ] **Step 2: Register the SDK only when enabled**
+- [x] **Step 2: Register the SDK only when enabled**
 
 Pin the latest stable versions of these packages in `TaskFlow.Infrastructure.csproj`:
 
@@ -303,13 +303,13 @@ Default `appsettings.json` on each host:
 
 Use `taskflow-scheduler` and `taskflow-notifications` on those hosts. Each `Program.cs` calls `AddTaskFlowOpenTelemetry`.
 
-- [ ] **Step 3: Add the spans that the automatic instrumentation does not cover**
+- [x] **Step 3: Add the spans that the automatic instrumentation does not cover**
 
 `TracingBehavior<TRequest, TResponse>` starts a span named `typeof(TRequest).Name` and is registered next to `ValidationBehavior` in `AddApplicationValidation`. It does not log.
 
 `DueSoonPublisher` injects W3C `traceparent` into the AMQP headers of `BasicProperties` before publish. `DueSoonConsumer` extracts that header and handles the message inside that activity. A message without the header is still processed.
 
-- [ ] **Step 4: Document the local switch and leave AWS untouched**
+- [x] **Step 4: Document the local switch and leave AWS untouched**
 
 `.env.example` gains empty values:
 
@@ -323,7 +323,7 @@ OTEL_EXPORTER_OTLP_HEADERS=
 
 Confirm `infra/compose/docker-compose.aws.yml` has no `OpenTelemetry` keys and no new service.
 
-- [ ] **Step 5: Re-run the new filter and `dotnet test TaskFlow.slnx`**
+- [x] **Step 5: Re-run the new filter and** `dotnet test TaskFlow.slnx`
 
 Expected: pass. With the default configuration, no test and no host opens a connection to Grafana.
 

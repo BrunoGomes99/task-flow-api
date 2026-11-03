@@ -16,13 +16,15 @@ public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Registers all FluentValidation validators from the Application assembly, adds
-    /// the ValidationBehavior to the MediatR pipeline, and registers task-cache invalidation.
+    /// the TracingBehavior (outermost span, no-op unless a listener is attached) and the
+    /// ValidationBehavior to the MediatR pipeline, and registers task-cache invalidation.
     /// </summary>
     public static IServiceCollection AddApplicationValidation(this IServiceCollection services)
     {
         Assembly assembly = typeof(CreateTaskCommandValidator).Assembly;
 
         services.AddValidatorsFromAssembly(assembly);
+        services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TracingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddSingleton<ITaskCacheInvalidator, TaskCacheInvalidator>();
 

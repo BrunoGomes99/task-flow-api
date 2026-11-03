@@ -5,6 +5,7 @@ using TaskFlow.Api.Middleware;
 using TaskFlow.Application.Extensions;
 using TaskFlow.Infrastructure.Extensions;
 using TaskFlow.Infrastructure.Health;
+using TaskFlow.Infrastructure.Observability;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,6 +22,7 @@ builder.Services.AddTaskFlowJwtAuthentication(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(TaskFlow.Application.UseCases.Tasks.CreateTask.CreateTaskCommand).Assembly));
 builder.Services.AddApplicationValidation();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddTaskFlowOpenTelemetry(builder.Configuration);
 builder.Services.AddTaskFlowHealthChecks(TaskFlowHealthRole.Api);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddTaskFlowSwagger();

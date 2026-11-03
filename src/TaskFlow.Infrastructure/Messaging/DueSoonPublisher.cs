@@ -1,9 +1,11 @@
+using System.Diagnostics;
 using System.Text.Json;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using TaskFlow.Application.Interfaces;
 using TaskFlow.Application.UseCases.Reminders;
 using TaskFlow.Infrastructure.Configuration;
+using TaskFlow.Infrastructure.Observability;
 
 namespace TaskFlow.Infrastructure.Messaging;
 
@@ -32,11 +34,14 @@ public sealed class DueSoonPublisher : IDueSoonPublisher, IAsyncDisposable
         try
         {
             var channel = await GetChannelAsync(cancellationToken);
+            using var activity = AmqpTracePropagation.Source.StartActivity("DueSoon publish", ActivityKind.Producer);
+            var headers = new Dictionary<string, object?>();
+            AmqpTracePropagation.Inject(headers, activity);
             await channel.BasicPublishAsync(
                 exchange: string.Empty,
                 routingKey: DueSoonTopology.Queue,
                 mandatory: false,
-                basicProperties: new BasicProperties { Persistent = true },
+                basicProperties: new BasicProperties { Persistent = true, Headers = headers },
                 body: body,
                 cancellationToken: cancellationToken);
         }

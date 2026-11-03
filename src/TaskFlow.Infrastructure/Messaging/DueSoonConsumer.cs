@@ -9,6 +9,7 @@ using TaskFlow.Application.Observability;
 using TaskFlow.Application.UseCases.Reminders;
 using TaskFlow.Application.UseCases.Reminders.DeliverDueSoonReminder;
 using TaskFlow.Infrastructure.Configuration;
+using TaskFlow.Infrastructure.Observability;
 
 namespace TaskFlow.Infrastructure.Messaging;
 
@@ -66,6 +67,8 @@ public sealed class DueSoonConsumer : BackgroundService
         BasicDeliverEventArgs delivery,
         CancellationToken stoppingToken)
     {
+        using var activity = AmqpTracePropagation.StartConsumer("DueSoon consume", delivery.BasicProperties.Headers);
+
         DueSoonMessage? message;
         try
         {
@@ -160,13 +163,15 @@ public sealed class DueSoonConsumer : BackgroundService
         int nextAttempt,
         CancellationToken cancellationToken)
     {
+        var headers = new Dictionary<string, object?>
+        {
+            [DueSoonTopology.AttemptHeader] = nextAttempt,
+        };
+        AmqpTracePropagation.CopyContext(delivery.BasicProperties.Headers, headers);
         var properties = new BasicProperties
         {
             Persistent = true,
-            Headers = new Dictionary<string, object?>
-            {
-                [DueSoonTopology.AttemptHeader] = nextAttempt,
-            },
+            Headers = headers,
         };
 
         await gate.WaitAsync(cancellationToken);

@@ -1,5 +1,6 @@
 using TaskFlow.Infrastructure.Extensions;
 using TaskFlow.Infrastructure.Health;
+using TaskFlow.Infrastructure.Observability;
 using TaskFlow.Infrastructure.Persistence;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -7,6 +8,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddTaskFlowOpenTelemetry(builder.Configuration);
 builder.Services.AddDueSoonNotifications(builder.Configuration);
 builder.Services.AddTaskFlowHealthChecks(TaskFlowHealthRole.Notifications);
 

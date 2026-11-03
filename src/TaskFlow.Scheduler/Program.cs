@@ -1,5 +1,6 @@
 using TaskFlow.Infrastructure.Extensions;
 using TaskFlow.Infrastructure.Health;
+using TaskFlow.Infrastructure.Observability;
 using TaskFlow.Infrastructure.Persistence;
 using TaskFlow.Scheduler;
 
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Logging.AddJsonConsole(options => options.IncludeScopes = true);
 
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddTaskFlowOpenTelemetry(builder.Configuration);
 builder.Services.AddDueSoonScheduler(builder.Configuration);
 builder.Services.AddTaskFlowHealthChecks(TaskFlowHealthRole.Scheduler);
 builder.Services.AddHostedService<DueSoonScanHostedService>();
