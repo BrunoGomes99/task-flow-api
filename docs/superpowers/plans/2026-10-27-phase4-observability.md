@@ -333,7 +333,7 @@ Expected: pass. With the default configuration, no test and no host opens a conn
 
 - Modify: `docs/ENGINEERING_GUIDELINES.md` checkboxes in the Phase 4 section
 
-- [ ] **Step 1: Check a box only when the task that implements it is done**
+- [x] **Step 1: Check a box only when the task that implements it is done**
 
 Task 1 checks the JSON log and request-correlation boxes. Task 2 checks health. Task 3 checks reminder logs. Task 4 checks metrics. Task 5 checks export and the EC2 exclusion. The cross-phase Logging box is checked when Task 1 is done.
 
