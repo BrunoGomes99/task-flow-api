@@ -5,10 +5,11 @@ data "aws_availability_zones" "available" {
 module "network" {
   source = "./modules/network"
 
-  name_prefix        = var.name_prefix
-  vpc_cidr           = var.vpc_cidr
-  public_subnet_cidr = var.public_subnet_cidr
-  az                 = data.aws_availability_zones.available.names[0]
+  name_prefix          = var.name_prefix
+  vpc_cidr             = var.vpc_cidr
+  azs                  = slice(data.aws_availability_zones.available.names, 0, 2)
+  public_subnet_cidrs  = var.public_subnet_cidrs
+  private_subnet_cidrs = var.private_subnet_cidrs
 }
 
 module "ecr" {

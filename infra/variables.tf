@@ -27,6 +27,18 @@ variable "public_subnet_cidr" {
   default     = "10.0.1.0/24"
 }
 
+variable "public_subnet_cidrs" {
+  description = "Two public subnet CIDRs. The first matches the existing public subnet."
+  type        = list(string)
+  default     = ["10.0.1.0/24", "10.0.2.0/24"]
+}
+
+variable "private_subnet_cidrs" {
+  description = "Two private subnet CIDRs, one per availability zone."
+  type        = list(string)
+  default     = ["10.0.11.0/24", "10.0.12.0/24"]
+}
+
 variable "allowed_ssh_cidr" {
   description = "CIDR allowed to access SSH. An empty value keeps SSH disabled."
   type        = string
