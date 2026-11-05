@@ -60,3 +60,11 @@ module "compute" {
   brevo_sender_email           = var.brevo_sender_email
   brevo_sender_name            = var.brevo_sender_name
 }
+
+module "security" {
+  source = "./modules/security"
+
+  name_prefix      = var.name_prefix
+  vpc_id           = module.network.vpc_id
+  allowed_api_cidr = var.allowed_api_cidr
+}
