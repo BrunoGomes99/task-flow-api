@@ -68,3 +68,15 @@ module "security" {
   vpc_id           = module.network.vpc_id
   allowed_api_cidr = var.allowed_api_cidr
 }
+
+module "secrets" {
+  source = "./modules/secrets"
+
+  name_prefix             = var.name_prefix
+  atlas_connection_string = var.atlas_connection_string
+  jwt_secret              = var.jwt_secret
+  rabbitmq_password       = var.rabbitmq_password
+  brevo_api_key           = var.brevo_api_key
+  brevo_sender_email      = var.brevo_sender_email
+  grafana_otlp_headers    = var.grafana_otlp_headers
+}

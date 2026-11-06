@@ -7,6 +7,9 @@ mongo_root_password = "replace-with-a-strong-mongo-password"
 rabbitmq_password   = "replacewithrabbit12"
 brevo_api_key       = "replace-with-brevo-api-key"
 brevo_sender_email  = "you@example.com"
+atlas_connection_string = "mongodb+srv://taskflow:replace-this-password@cluster.example.mongodb.net/?retryWrites=true&w=majority"
+grafana_otlp_endpoint   = "https://otlp-gateway-prod-us-east-0.grafana.net/otlp"
+grafana_otlp_headers    = "Basic cmVwbGFjZTp0aGlz"
 
 # Optional overrides:
 # name_prefix         = "taskflow"

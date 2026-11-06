@@ -179,3 +179,53 @@ variable "brevo_sender_name" {
   type        = string
   default     = "TaskFlow"
 }
+
+variable "atlas_connection_string" {
+  description = "Atlas connection string, including credentials. Do not commit real values."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = startswith(var.atlas_connection_string, "mongodb")
+    error_message = "atlas_connection_string must be a MongoDB URI."
+  }
+}
+
+variable "grafana_otlp_endpoint" {
+  description = "Grafana Cloud OTLP gateway base URL, without a signal path."
+  type        = string
+
+  validation {
+    condition     = startswith(var.grafana_otlp_endpoint, "https://")
+    error_message = "grafana_otlp_endpoint must be an https URL."
+  }
+}
+
+variable "grafana_otlp_headers" {
+  description = "Value of the Grafana Authorization header (Basic <base64>), without the Authorization= prefix."
+  type        = string
+  sensitive   = true
+
+  validation {
+    condition     = startswith(var.grafana_otlp_headers, "Basic ")
+    error_message = "grafana_otlp_headers must start with 'Basic '."
+  }
+}
+
+variable "scheduler_image_tag" {
+  description = "Tag of the scheduler image in ECR. Plan 2 stops Terraform from rolling this back."
+  type        = string
+  default     = "latest"
+}
+
+variable "notifications_image_tag" {
+  description = "Tag of the notifications image in ECR. Plan 2 stops Terraform from rolling this back."
+  type        = string
+  default     = "latest"
+}
+
+variable "adot_image" {
+  description = "Pinned ADOT collector image."
+  type        = string
+  default     = "public.ecr.aws/aws-observability/aws-otel-collector:v0.51.0"
+}
