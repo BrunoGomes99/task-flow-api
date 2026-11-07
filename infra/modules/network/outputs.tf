@@ -3,11 +3,6 @@ output "vpc_id" {
   value       = aws_vpc.this.id
 }
 
-output "public_subnet_id" {
-  description = "First public subnet. Kept until the EC2 module is removed."
-  value       = aws_subnet.public.id
-}
-
 output "public_subnet_ids" {
   description = "Both public subnet IDs, for the ALB."
   value       = [aws_subnet.public.id, aws_subnet.public_b.id]

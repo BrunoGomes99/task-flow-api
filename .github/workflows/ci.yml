@@ -1,26 +1,14 @@
-# Single pipeline (format A): CI on every PR/push; ECR publish + EC2 Compose
-# redeploy only after the GitHub Environment "production" approval gate on main
-# (or manual dispatch).
+# CI on every PR and push; ECR publish of the three Dockerfiles after the
+# `production` environment on `main`. Publish does not deploy. Deploy until
+# the CD plan is `terraform apply` with the image tag variables.
 #
 # Auth: GitHub OIDC → IAM role (no long-lived AWS keys in the workflow).
 # Configure repo Variables (Settings → Secrets and variables → Actions → Variables):
-#   AWS_REGION          e.g. us-east-1
-#   AWS_ROLE_TO_ASSUME  ARN of a role trustable by GitHub OIDC
-#                       (ECR push + ssm:SendCommand / GetCommandInvocation + ec2:DescribeInstances)
-#   ECR_REPOSITORY      e.g. taskflow-api
-# Optional:
-#   SCHEDULER_ECR_REPOSITORY       default taskflow-scheduler
-#   NOTIFICATIONS_ECR_REPOSITORY   default taskflow-notifications
-#   NAME_PREFIX         default taskflow (must match Terraform name_prefix; tags Name=<prefix>-api)
-#   EC2_INSTANCE_ID     pin a specific instance instead of discovering by tag TaskFlowRedeploy=enabled
+#   AWS_REGION
+#   AWS_ROLE_TO_ASSUME   ARN of a role trustable by GitHub OIDC (ECR push)
+#   API_REPOSITORY, SCHEDULER_REPOSITORY, NOTIFICATIONS_REPOSITORY
 #
 # Also create Environment "production" with required reviewers so publish waits for Approve.
-#
-# Temporary until ECS: after push, SSM Run Command copies docker-compose.aws.yml to
-# /opt/taskflow, pins API/scheduler/notifications images to github.sha, then
-# docker compose pull && up -d. RabbitMQ and Brevo values must already be in
-# that .env (user-data writes them on first boot; an older instance needs them
-# added once). Replace with ECS update-service when migrating off EC2 Compose.
 
 name: CI
 
@@ -112,121 +100,3 @@ jobs:
           build_push src/TaskFlow.Api/Dockerfile "${API_REPOSITORY}"
           build_push src/TaskFlow.Scheduler/Dockerfile "${SCHEDULER_REPOSITORY}"
           build_push src/TaskFlow.Notifications/Dockerfile "${NOTIFICATIONS_REPOSITORY}"
-
-  # Temporary bridge until ECS: pin Compose to github.sha via SSM (not :latest).
-  redeploy-ec2:
-    name: Redeploy Compose on EC2 (SSM)
-    needs: publish-ecr
-    if: >
-      github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      id-token: write
-    env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      API_REPOSITORY: ${{ vars.API_REPOSITORY }}
-      SCHEDULER_REPOSITORY: ${{ vars.SCHEDULER_REPOSITORY }}
-      NOTIFICATIONS_REPOSITORY: ${{ vars.NOTIFICATIONS_REPOSITORY }}
-      NAME_PREFIX: ${{ vars.NAME_PREFIX }}
-      IMAGE_TAG: ${{ needs.publish-ecr.outputs.image_tag }}
-      REGISTRY: ${{ needs.publish-ecr.outputs.registry }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials (OIDC)
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: SSM Run Command — pull and up pinned SHA
-        run: |
-          set -euo pipefail
-          NAME_PREFIX="${NAME_PREFIX:-taskflow}"
-
-          if [ -n "${{ vars.EC2_INSTANCE_ID }}" ]; then
-            INSTANCE_ID="${{ vars.EC2_INSTANCE_ID }}"
-          else
-            INSTANCE_ID="$(aws ec2 describe-instances \
-              --filters \
-                "Name=tag:TaskFlowRedeploy,Values=enabled" \
-                "Name=tag:Name,Values=${NAME_PREFIX}-api" \
-                "Name=instance-state-name,Values=running" \
-              --query 'Reservations[0].Instances[0].InstanceId' \
-              --output text)"
-          fi
-
-          if [ -z "${INSTANCE_ID}" ] || [ "${INSTANCE_ID}" = "None" ]; then
-            echo "::error::No running EC2 instance found for SSM redeploy (tag TaskFlowRedeploy=enabled). Apply infra and wait for SSM Online."
-            exit 1
-          fi
-
-          echo "Redeploying instance ${INSTANCE_ID} to ${REGISTRY}/${API_REPOSITORY}:${IMAGE_TAG}"
-
-          COMPOSE_B64="$(base64 -w 0 infra/compose/docker-compose.aws.yml)"
-
-          REMOTE_SCRIPT=$(cat <<EOF
-          set -euo pipefail
-          cd /opt/taskflow
-          printf '%s' '${COMPOSE_B64}' | base64 -d > /opt/taskflow/docker-compose.yml
-          set_env() {
-            key="\$1"
-            value="\$2"
-            if grep -q "^\${key}=" .env; then
-              sed -i "s|^\${key}=.*|\${key}=\${value}|" .env
-            else
-              printf '%s=%s\n' "\${key}" "\${value}" >> .env
-            fi
-          }
-          set_env API_IMAGE '${REGISTRY}/${API_REPOSITORY}:${IMAGE_TAG}'
-          set_env SCHEDULER_IMAGE '${REGISTRY}/${SCHEDULER_REPOSITORY}:${IMAGE_TAG}'
-          set_env NOTIFICATIONS_IMAGE '${REGISTRY}/${NOTIFICATIONS_REPOSITORY}:${IMAGE_TAG}'
-          for key in RABBITMQ_USER RABBITMQ_PASSWORD BREVO_API_KEY BREVO_SENDER_EMAIL; do
-            if ! grep -Eq "^\${key}=.+" .env; then
-              echo "Missing \${key} in /opt/taskflow/.env. Add it on the instance; user-data does not re-run."
-              exit 1
-            fi
-          done
-          aws ecr get-login-password --region '${AWS_REGION}' \
-            | docker login --username AWS --password-stdin '${REGISTRY}'
-          docker compose pull
-          docker compose up -d --wait
-          curl -fsS http://127.0.0.1:8080/health
-          echo "Redeploy OK: ${IMAGE_TAG}"
-          EOF
-          )
-
-          # Flatten leading indent from the heredoc for SSM.
-          REMOTE_SCRIPT="$(printf '%s\n' "${REMOTE_SCRIPT}" | sed 's/^[[:space:]]*//')"
-
-          COMMAND_ID="$(aws ssm send-command \
-            --instance-ids "${INSTANCE_ID}" \
-            --document-name "AWS-RunShellScript" \
-            --comment "TaskFlow Compose redeploy ${IMAGE_TAG}" \
-            --parameters "$(jq -nc --arg s "${REMOTE_SCRIPT}" '{commands:[$s]}')" \
-            --query 'Command.CommandId' \
-            --output text)"
-
-          echo "SSM CommandId=${COMMAND_ID}"
-          aws ssm wait command-executed \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${INSTANCE_ID}"
-
-          STATUS="$(aws ssm get-command-invocation \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${INSTANCE_ID}" \
-            --query 'Status' \
-            --output text)"
-
-          aws ssm get-command-invocation \
-            --command-id "${COMMAND_ID}" \
-            --instance-id "${INSTANCE_ID}" \
-            --query '{Status:Status,Stdout:StandardOutputContent,Stderr:StandardErrorContent}' \
-            --output json
-
-          if [ "${STATUS}" != "Success" ]; then
-            echo "::error::SSM redeploy failed with status ${STATUS}"
-            exit 1
-          fi

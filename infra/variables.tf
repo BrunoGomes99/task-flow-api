@@ -21,12 +21,6 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
-variable "public_subnet_cidr" {
-  description = "CIDR block for the public subnet."
-  type        = string
-  default     = "10.0.1.0/24"
-}
-
 variable "public_subnet_cidrs" {
   description = "Two public subnet CIDRs. The first matches the existing public subnet."
   type        = list(string)
@@ -39,19 +33,8 @@ variable "private_subnet_cidrs" {
   default     = ["10.0.11.0/24", "10.0.12.0/24"]
 }
 
-variable "allowed_ssh_cidr" {
-  description = "CIDR allowed to access SSH. An empty value keeps SSH disabled."
-  type        = string
-  default     = ""
-
-  validation {
-    condition     = var.allowed_ssh_cidr == "" || can(cidrhost(var.allowed_ssh_cidr, 0))
-    error_message = "allowed_ssh_cidr must be empty or a valid CIDR block."
-  }
-}
-
 variable "allowed_api_cidr" {
-  description = "CIDR allowed to reach the API on TCP 8080. Default is open for study; restrict to your IP in tfvars when possible."
+  description = "CIDR allowed to reach the API load balancer on TCP 80. Default is open for study; restrict to your IP in tfvars when possible."
   type        = string
   default     = "0.0.0.0/0"
 
@@ -77,12 +60,6 @@ variable "ecr_notifications_repository_name" {
   description = "Name of the ECR repository for the notifications image."
   type        = string
   default     = "taskflow-notifications"
-}
-
-variable "instance_type" {
-  description = "EC2 instance type for the Compose host. Due reminders add RabbitMQ and two workers; use t3.small if t3.micro runs out of memory."
-  type        = string
-  default     = "t3.small"
 }
 
 variable "api_image_tag" {
@@ -112,23 +89,6 @@ variable "jwt_audience" {
   description = "Jwt:Audience passed to the API container."
   type        = string
   default     = "TaskFlow.Api"
-}
-
-variable "mongo_root_username" {
-  description = "MongoDB root username used on the instance (not published to the internet)."
-  type        = string
-  default     = "taskflow"
-}
-
-variable "mongo_root_password" {
-  description = "MongoDB root password. Do not commit real values."
-  type        = string
-  sensitive   = true
-
-  validation {
-    condition     = length(var.mongo_root_password) >= 12
-    error_message = "mongo_root_password must be at least 12 characters."
-  }
 }
 
 variable "rabbitmq_user" {
