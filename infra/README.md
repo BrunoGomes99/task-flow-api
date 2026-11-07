@@ -108,7 +108,7 @@ Useful outputs after apply:
 - `cluster_name` — ECS cluster name
 - `ecr_repository_url`, `ecr_scheduler_repository_url`, `ecr_notifications_repository_url` — image push targets
 
-Publishing a new image does not deploy it. Until the CD plan, deploy with `terraform apply` and the image tag variables.
+Publishing a new image deploys it with `ecs update-service` on the three .NET services. See [GitHub Actions deploy](#github-actions-deploy).
 
 ### Validate without a remote bucket
 
@@ -136,8 +136,7 @@ The workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 1. **CI** — restore / build / test on PRs and pushes.
 2. **Publish** — only on push to `main` (or `workflow_dispatch`), after CI succeeds, behind the GitHub Environment `production` (manual Approve).
 3. Build uses the three Dockerfiles, tags each image with `github.sha` and `latest`, and pushes to ECR via **OIDC**.
-
-Publish does not deploy. Deploy until the CD plan is `terraform apply` with the image tag variables.
+4. **Deploy** — `ecs update-service` for the three .NET services. See [GitHub Actions deploy](#github-actions-deploy).
 
 ### One-time GitHub + IAM setup
 
@@ -154,6 +153,30 @@ Publish does not deploy. Deploy until the CD plan is `terraform apply` with the 
 | `NOTIFICATIONS_REPOSITORY` | `taskflow-notifications` | yes |
 
 Until OIDC is configured, CI still runs; publish fails at AWS auth — that is expected.
+
+## GitHub Actions deploy
+
+Publish still builds the three Dockerfiles and pushes `github.sha` and `latest`. The deploy job then registers a task definition revision and updates the three .NET services. Redis and RabbitMQ are not in that job.
+
+Repository variables:
+
+| Variable | Example |
+|---|---|
+| `ECS_CLUSTER` | `taskflow` |
+| `ECS_SERVICE_API` | `taskflow-api` |
+| `ECS_SERVICE_SCHEDULER` | `taskflow-scheduler` |
+| `ECS_SERVICE_NOTIFICATIONS` | `taskflow-notifications` |
+| `ALB_DNS_NAME` | the `alb_dns_name` output, without `http://` |
+
+Remove `EC2_INSTANCE_ID`. The OIDC role no longer needs `ssm:SendCommand` or `ec2:DescribeInstances` for deploy. It needs:
+
+- `ecs:DescribeServices`
+- `ecs:DescribeTaskDefinition`
+- `ecs:RegisterTaskDefinition`
+- `ecs:UpdateService`
+- `iam:PassRole` on the ECS execution role
+
+ECR push permissions stay.
 
 ## Security reminders
 
