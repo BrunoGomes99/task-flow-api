@@ -1,0 +1,40 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+
+processors:
+  resourcedetection:
+    detectors: [env, ecs]
+    timeout: 2s
+    override: false
+  resource:
+    attributes:
+      - key: deployment.environment
+        value: aws
+        action: upsert
+      - key: service.version
+        value: ${env:SERVICE_VERSION}
+        action: upsert
+
+exporters:
+  otlphttp:
+    endpoint: ${env:GRAFANA_OTLP_ENDPOINT}
+    headers:
+      Authorization: ${env:GRAFANA_OTLP_HEADERS}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [resourcedetection, resource]
+      exporters: [otlphttp]
+    metrics:
+      receivers: [otlp]
+      processors: [resourcedetection, resource]
+      exporters: [otlphttp]
+    logs:
+      receivers: [otlp]
+      processors: [resourcedetection, resource]
+      exporters: [otlphttp]

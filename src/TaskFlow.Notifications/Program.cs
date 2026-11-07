@@ -20,7 +20,6 @@ using (var scope = app.Services.CreateScope())
     await initializer.InitializeAsync();
 }
 
-app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 app.MapGet("/health/live", () => Results.Ok(new { status = "healthy" }));
 app.MapHealthChecks("/health/ready");
 app.Run();

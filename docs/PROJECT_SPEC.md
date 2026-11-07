@@ -187,7 +187,7 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 - **GitHub Actions:** CI on push/PR (restore, build, test).
 - **Container publish:** build the existing API Dockerfile and push to **Amazon ECR**; after Approve, temporary **SSM** redeploy on EC2 pins Compose to `github.sha`.
 - **AWS study environment (low cost):** Terraform under `infra/` for VPC (public subnet, no NAT), ECR, and a small **EC2** host running Docker Compose (**API + Mongo on the same instance**). Provider assumes IAM role `terraform-deploy-role`; remote state on **S3** with `use_lockfile` (no DynamoDB). Environment must be easy to destroy when idle.
-- **Future (documented only):** evolve the same ECR image to **ECS** (Fargate + ALB); move Mongo off the EC2 host; **remove** SSM Compose redeploy. On ECS, pin the running task to an immutable image tag (`github.sha`) or digest—not `:latest`.
+- **Future:** the ECS runtime is specified in [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md). On ECS, pin the running task to an immutable image tag (`github.sha`) or digest—not `:latest`.
 - Design: [superpowers/specs/2026-08-02-ci-cd-ec2-design.md](superpowers/specs/2026-08-02-ci-cd-ec2-design.md).
 
 ### Phase 3 — Cache and Due Reminder
@@ -199,10 +199,20 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 
 Approved, not implemented. Design: [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md). Plan: [superpowers/plans/2026-10-27-phase4-observability.md](superpowers/plans/2026-10-27-phase4-observability.md).
 
-- **Logs and health:** JSON logs on the API, scheduler, and notifications worker. One request log correlated with `ProblemDetails.extensions.traceId`. `GET /health` stays liveness for Compose and CI. `GET /health/ready` checks MongoDB (and Redis as degraded on the API; RabbitMQ on the workers). Brevo is not a readiness check.
+- **Logs and health:** JSON logs on the API, scheduler, and notifications worker. One request log correlated with `ProblemDetails.extensions.traceId`. Liveness is `GET /health/live`. `GET /health/ready` checks MongoDB (and Redis as degraded on the API; RabbitMQ on the workers). Brevo is not a readiness check.
 - **Metrics:** `System.Diagnostics.Metrics` for cache lookups and the due-reminder scan, publish, and delivery. Viewable with `dotnet-counters` before any export.
 - **Grafana Cloud:** OpenTelemetry OTLP export is off unless configured. The application does not reference a vendor SDK. Local Compose can pass the endpoint. The EC2 Compose file does not.
-- **ECS (later, not this phase):** the same OTLP application signal is forwarded by an ADOT or Alloy sidecar when Fargate replaces the EC2 host. CPU and memory of the task stay in CloudWatch. That migration also retargets liveness callers (`docker-compose`, the EC2 Compose file, CI, and the SSM curl) from `GET /health` to `GET /health/live` and removes `GET /health`. Readiness stays `GET /health/ready`.
+- **ECS:** the same OTLP application signal is forwarded by an ADOT sidecar on the three .NET tasks. CPU and memory of the task stay in CloudWatch. Liveness is `GET /health/live` and `GET /health` is removed. Readiness stays `GET /health/ready`. Design: [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md).
+
+### Phase 5 — ECS
+
+The EC2 Compose host is replaced by Fargate. Design: [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md).
+
+- One NAT Gateway, two public subnets, two private subnets, tasks without public IPs.
+- ALB on port 80 in front of the API only. Readiness is `GET /health/ready`. Liveness is `GET /health/live`. `GET /health` is removed.
+- Atlas holds MongoDB and starts empty. Redis and RabbitMQ are ECS services. RabbitMQ on ECS has no management plugin.
+- ADOT sidecar on the three .NET tasks forwards OTLP to Grafana Cloud. The Grafana header stays on the sidecar.
+- SSM redeploy is removed. Until the CD plan, a new image is deployed with `terraform apply` and the image tag variables.
 
 ---
 
@@ -211,13 +221,13 @@ Approved, not implemented. Design: [superpowers/specs/2026-10-27-phase4-observab
 - Define MongoDB repositories and indexes (UserId, UserId + DueDate) early in Phase 1.
 - JWT is manual; **`ExpiresIn`** must match the signing configuration (same lifetime as the `exp` claim) so clients are not misled.
 - **Refresh tokens / revocation:** not in Phase 1; a future version may add refresh flows and storage—extend the API additively (e.g. optional `refresh_token` field) so existing clients keep working.
-- **AWS cost:** keep Phase 2 study infra minimal (no NAT/ALB/DocumentDB); always `terraform destroy` when not in use. Mongo on EC2 is for learning only, not a production HA pattern.
+- **AWS cost:** Phase 5 adds one NAT Gateway and one ALB, which bill per hour while the stack exists. Always `terraform destroy` when not in use. Atlas and Grafana Cloud are not destroyed with the stack.
 
 ---
 
 ## 13. Document History
 
-- **2026-10-29:** Phase 4 liveness alias clarified. `GET /health` and `GET /health/live` stay equivalent in this phase, and existing curls keep `GET /health`. The ECS migration retargets those callers to `GET /health/live` and removes `GET /health`.
+- **2026-11-07:** Phase 5 replaces the EC2 Compose host with Fargate. Design: [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md). Phase 4 liveness alias clarified. `GET /health` and `GET /health/live` stay equivalent in this phase, and existing curls keep `GET /health`. The ECS migration retargets those callers to `GET /health/live` and removes `GET /health`.
 - **2026-10-27:** Phase 4 observability approved, not implemented. JSON logs, liveness versus readiness, `System.Diagnostics.Metrics`, and opt-in OpenTelemetry export to Grafana Cloud. The current EC2 host stays without a collector. ECS picks up the same signal later via a sidecar. See [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md).
 - **2026-10-16:** Phase 3 messaging redefined. `NotificationLog` is the receipt for a `DueSoon` email about 24 hours before `DueDate`, sent by a notifications worker via Brevo. A scheduler worker publishes. `TaskCreated` / `TaskCompleted` publishes are dropped. ECS stays out of this phase; EC2 may move from `t3.micro` to `t3.small` if memory is short. See [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
 - **2026-10-14:** Phase 3 cache implemented: Cache Aside on `GetTaskById`, absolute 60s TTL, three delete retries, no cache-repair queue. Redis is in local Compose and in the EC2 Compose file (unpublished, memory-capped). See [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md) and [superpowers/plans/2026-10-14-phase3-cache.md](superpowers/plans/2026-10-14-phase3-cache.md).
