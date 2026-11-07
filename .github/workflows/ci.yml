@@ -1,12 +1,14 @@
 # CI on every PR and push; ECR publish of the three Dockerfiles after the
-# `production` environment on `main`. Publish does not deploy. Deploy until
-# the CD plan is `terraform apply` with the image tag variables.
+# `production` environment on `main`. Publish is followed by `ecs update-service`
+# for the three .NET services.
 #
 # Auth: GitHub OIDC → IAM role (no long-lived AWS keys in the workflow).
 # Configure repo Variables (Settings → Secrets and variables → Actions → Variables):
 #   AWS_REGION
-#   AWS_ROLE_TO_ASSUME   ARN of a role trustable by GitHub OIDC (ECR push)
+#   AWS_ROLE_TO_ASSUME   ARN of a role trustable by GitHub OIDC (ECR push and ECS deploy)
 #   API_REPOSITORY, SCHEDULER_REPOSITORY, NOTIFICATIONS_REPOSITORY
+#   ECS_CLUSTER, ECS_SERVICE_API, ECS_SERVICE_SCHEDULER, ECS_SERVICE_NOTIFICATIONS
+#   ALB_DNS_NAME
 #
 # Also create Environment "production" with required reviewers so publish waits for Approve.
 
@@ -100,3 +102,85 @@ jobs:
           build_push src/TaskFlow.Api/Dockerfile "${API_REPOSITORY}"
           build_push src/TaskFlow.Scheduler/Dockerfile "${SCHEDULER_REPOSITORY}"
           build_push src/TaskFlow.Notifications/Dockerfile "${NOTIFICATIONS_REPOSITORY}"
+
+  deploy-ecs:
+    name: Deploy github.sha to ECS
+    needs: publish-ecr
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      ECS_CLUSTER: ${{ vars.ECS_CLUSTER }}
+      API_REPOSITORY: ${{ vars.API_REPOSITORY }}
+      SCHEDULER_REPOSITORY: ${{ vars.SCHEDULER_REPOSITORY }}
+      NOTIFICATIONS_REPOSITORY: ${{ vars.NOTIFICATIONS_REPOSITORY }}
+      IMAGE_TAG: ${{ needs.publish-ecr.outputs.image_tag }}
+      REGISTRY: ${{ needs.publish-ecr.outputs.registry }}
+      ALB_DNS_NAME: ${{ vars.ALB_DNS_NAME }}
+    steps:
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Register revisions and update services
+        run: |
+          set -euo pipefail
+          deploy_service() {
+            local family="$1"
+            local container="$2"
+            local image="$3"
+            local current
+            current="$(aws ecs describe-task-definition --task-definition "$family" --query 'taskDefinition' --output json)"
+            local payload
+            payload="$(echo "$current" | jq --arg container "$container" --arg image "$image" --arg version "$IMAGE_TAG" '
+              .containerDefinitions |= map(
+                if .name == $container then
+                  .image = $image
+                  | .environment |= map(if .name == "SERVICE_VERSION" then .value = $version else . end)
+                elif .name == "adot" then
+                  .environment |= map(if .name == "SERVICE_VERSION" then .value = $version else . end)
+                else
+                  .
+                end
+              )
+              | {
+                  family,
+                  taskRoleArn,
+                  executionRoleArn,
+                  networkMode,
+                  containerDefinitions,
+                  volumes,
+                  placementConstraints,
+                  requiresCompatibilities,
+                  cpu,
+                  memory,
+                  runtimePlatform,
+                  pidMode,
+                  ipcMode
+                }
+              | with_entries(select(.value != null))
+            ')"
+            local arn
+            arn="$(aws ecs register-task-definition --cli-input-json "$payload" --query 'taskDefinition.taskDefinitionArn' --output text)"
+            aws ecs update-service \
+              --cluster "$ECS_CLUSTER" \
+              --service "$family" \
+              --task-definition "$arn" \
+              --query 'service.serviceName' \
+              --output text
+          }
+          deploy_service "${{ vars.ECS_SERVICE_API }}" "taskflow-api" "${REGISTRY}/${API_REPOSITORY}:${IMAGE_TAG}"
+          deploy_service "${{ vars.ECS_SERVICE_SCHEDULER }}" "taskflow-scheduler" "${REGISTRY}/${SCHEDULER_REPOSITORY}:${IMAGE_TAG}"
+          deploy_service "${{ vars.ECS_SERVICE_NOTIFICATIONS }}" "taskflow-notifications" "${REGISTRY}/${NOTIFICATIONS_REPOSITORY}:${IMAGE_TAG}"
+          aws ecs wait services-stable \
+            --cluster "$ECS_CLUSTER" \
+            --services "${{ vars.ECS_SERVICE_API }}" "${{ vars.ECS_SERVICE_SCHEDULER }}" "${{ vars.ECS_SERVICE_NOTIFICATIONS }}"
+          curl -fsS "http://${ALB_DNS_NAME}/health/ready"
+          echo "Deploy OK: ${IMAGE_TAG}"
