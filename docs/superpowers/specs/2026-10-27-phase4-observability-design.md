@@ -147,6 +147,8 @@ When the documented ECS evolution lands (Fargate, ALB, Mongo off the EC2 host, S
 
 No EC2 instance, Compose file, or Terraform module changes for this in Phase 4.
 
+The ECS migration is specified in [2026-11-04-ecs-migration-design.md](2026-11-04-ecs-migration-design.md).
+
 ### D10 — Where the code lives
 
 Domain does not gain a logging, metrics, or health reference.

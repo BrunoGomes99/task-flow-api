@@ -8,10 +8,9 @@ namespace TaskFlow.Api.Controllers;
 public class HealthController : ControllerBase
 {
     /// <summary>
-    /// Health check for Docker and orchestration.
+    /// Liveness check for Docker and orchestration.
     /// </summary>
     [HttpGet]
-    [Route("/health")]
     [Route("/health/live")]
     [ProducesResponseType(typeof(HealthResponse), StatusCodes.Status200OK)]
     public IActionResult Get()

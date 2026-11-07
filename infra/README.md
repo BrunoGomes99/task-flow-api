@@ -1,26 +1,27 @@
 # TaskFlow infrastructure
 
-Terraform scaffold for a **low-cost, destroyable** AWS study environment:
+Terraform for a destroyable AWS study environment. Fargate replaces the old EC2 Compose host. Design: [docs/superpowers/specs/2026-11-04-ecs-migration-design.md](../docs/superpowers/specs/2026-11-04-ecs-migration-design.md).
 
 | Module | What it creates |
 |--------|-----------------|
-| `modules/network` | VPC, public subnet, Internet Gateway (no NAT) |
-| `modules/ecr` | ECR repository for the API image (`taskflow-api` by default) |
-| `modules/compute` | EC2 (Amazon Linux 2023), security group, IAM instance profile, user-data |
+| `modules/network` | VPC `10.0.0.0/16`, two public subnets, two private subnets, one NAT Gateway |
+| `modules/ecr` | ECR repositories `taskflow-api`, `taskflow-scheduler`, and `taskflow-notifications` |
+| `modules/security` | Security groups for the ALB, API, scheduler, notifications, Redis, and RabbitMQ |
+| `modules/secrets` | Secrets Manager entries for Atlas, JWT, RabbitMQ, Brevo, and the Grafana header |
+| `modules/ecs` | Fargate cluster, Service Connect namespace `taskflow`, five services, and the API load balancer |
 
-On first boot, user-data installs Docker from Amazon Linux 2023 repos and the Compose V2 CLI plugin from the official GitHub release (AL2023 does not package `docker-compose-plugin`), writes `infra/compose/docker-compose.aws.yml` and a `.env` under `/opt/taskflow`, authenticates to ECR, and runs **API + MongoDB + Redis + RabbitMQ + scheduler + notifications** on the same host. MongoDB port **27017**, Redis port **6379**, and RabbitMQ ports **5672** and **15672** are not opened on the security group. Redis is capped at 64 MiB with `allkeys-lru`. RabbitMQ is capped at 256 MiB.
+Tasks have no public IP. The ALB is the only public entry and it reaches only the API, on port 80. Redis is reached as `redis:6379`. RabbitMQ is reached as `rabbitmq:5672` and does not run the management plugin. MongoDB is an Atlas M0 cluster that Terraform does not create.
 
-`terraform.tfvars` must set `rabbitmq_password`, `brevo_api_key`, and `brevo_sender_email` (see `terraform.tfvars.example`). Apply creates ECR repositories `taskflow-api`, `taskflow-scheduler`, and `taskflow-notifications`. The GitHub OIDC role that pushes images needs ECR push on all three. An instance that already booted does not re-run user-data: add `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `BREVO_API_KEY`, and `BREVO_SENDER_EMAIL` to `/opt/taskflow/.env` once before the next SSM redeploy. If `t3.micro` runs out of memory, set `instance_type` to `t3.small`. That change replaces the instance and the MongoDB data on its disk. See [docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md](../docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
-
-This stack is a learning scaffold. **Do not treat it as production HA.** Prefer `terraform destroy` when idle.
+This stack is a learning scaffold. **Do not treat it as production HA.** One NAT Gateway is a single point of egress. Prefer `terraform destroy` when idle.
 
 ## Prerequisites
 
 - [Terraform](https://developer.hashicorp.com/terraform/install) `>= 1.10` (S3 native state locking via `use_lockfile`)
 - [AWS CLI](https://aws.amazon.com/cli/) with base credentials (SSO profile or keys) that can `sts:AssumeRole` on `terraform-deploy-role`
-- An IAM role **`terraform-deploy-role`** (or equivalent) with least-privilege deploy permissions for this stack
+- An IAM role `terraform-deploy-role` (or equivalent) with least-privilege deploy permissions for this stack
 - An **S3 bucket for Terraform state**, created **outside** this root (versioning on, block public access, encryption). This stack does not manage the state bucket.
-- Optional: GitHub Environment **`production`** + OIDC role for the publish job (see [GitHub Actions → ECR](#github-actions--ecr-publish))
+- An Atlas M0 cluster in the region closest to `us-east-1`
+- GitHub Environment `production` + OIDC role that can push the three ECR repositories (see [GitHub Actions → ECR](#github-actions--ecr-publish))
 
 ## Auth (`assume_role`)
 
@@ -28,35 +29,34 @@ The AWS provider assumes your deploy role. Copy the example tfvars and set the r
 
 ```powershell
 Copy-Item terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars:
+# Edit terraform.tfvars (gitignored):
 #   terraform_deploy_role_arn = "arn:aws:iam::ACCOUNT_ID:role/terraform-deploy-role"
+#   atlas_connection_string   = "mongodb+srv://..."
 #   jwt_secret                = "..."   # >= 32 characters
-#   mongo_root_password       = "..."   # >= 12 characters
+#   rabbitmq_password         = "..."
+#   brevo_api_key             = "..."
+#   brevo_sender_email        = "you@example.com"
+#   grafana_otlp_endpoint     = "https://..."
+#   grafana_otlp_headers      = "Basic <base64>"
 ```
 
 `terraform.tfvars` is gitignored. Do not commit real account IDs or secrets.
-
-You can also pass sensitive values via environment variables:
-
-```powershell
-$env:TF_VAR_jwt_secret = "..."
-$env:TF_VAR_mongo_root_password = "..."
-$env:TF_VAR_terraform_deploy_role_arn = "arn:aws:iam::ACCOUNT_ID:role/terraform-deploy-role"
-```
 
 ### Important variables
 
 | Variable | Required | Notes |
 |----------|----------|--------|
 | `terraform_deploy_role_arn` | yes | Role Terraform assumes for all AWS API calls |
+| `atlas_connection_string` | yes | Sensitive; must start with `mongodb` |
 | `jwt_secret` | yes | Sensitive; min 32 characters |
-| `mongo_root_password` | yes | Sensitive; min 12 characters |
+| `rabbitmq_password` | yes | Sensitive; letters and digits, min 12 |
+| `brevo_api_key` | yes | Sensitive |
+| `brevo_sender_email` | yes | Verified Brevo sender |
+| `grafana_otlp_endpoint` | yes | Grafana Cloud OTLP base URL, `https://`, no signal path |
+| `grafana_otlp_headers` | yes | Sensitive; `Basic <base64>`, without an `Authorization=` prefix |
 | `aws_region` | no | Default `us-east-1` |
-| `allowed_api_cidr` | no | Default `0.0.0.0/0` (restrict to your IP when possible) |
-| `allowed_ssh_cidr` | no | Empty = SSH disabled |
-| `instance_type` | no | Default `t3.micro` |
-| `api_image_tag` | no | Default `latest` (must exist in ECR for a healthy first boot) |
-| `ecr_repository_name` | no | Default `taskflow-api` |
+| `allowed_api_cidr` | no | Default `0.0.0.0/0` on the ALB listener (restrict to your IP when possible) |
+| `api_image_tag` | no | Default `latest`. Scheduler and notifications tags default to `latest` too |
 
 ## Remote state (S3 only, no DynamoDB)
 
@@ -81,35 +81,34 @@ If you already have local state, add `-migrate-state` when prompted.
 
 `backend.hcl` is gitignored. Commit only `backend.hcl.example`.
 
-## Plan / apply / destroy
+## Apply order
+
+1. Create the Atlas M0 cluster in the Atlas UI. Terraform does not create it, and `terraform destroy` does not delete it. The database starts empty. `MongoIndexesInitializer` creates indexes when a host starts. The database name stays `TaskFlowDb`.
+2. Fill the gitignored tfvars listed above.
+3. Publish the three images to ECR (GitHub **production** gate or a local `docker push`). The task definitions pull `api_image_tag`, `scheduler_image_tag`, and `notifications_image_tag` (default `latest`).
+4. From `infra/`:
 
 ```powershell
-# From infra/
 terraform init -backend-config=backend.hcl
 terraform validate
 terraform plan
 terraform apply
 ```
 
+5. Copy the `nat_public_ip` output into the Atlas network access list as a `/32`. Do not add a task public IP. Tasks have none.
+6. Open `health_url` (`http://<alb_dns_name>/health/ready`).
+
+Readiness stays failed until Atlas accepts that address, so the ALB does not route to the API yet. Liveness can still pass: `GET /health/live` on the ALB returns 200 once a task is up, and ECS does not restart the task for a failed readiness check. After Atlas accepts the NAT address, `GET /health/ready` returns 200.
+
 Useful outputs after apply:
 
-- `ecr_repository_url` — target for `docker push` / GitHub publish job
-- `public_ip` — EC2 public IPv4
-- `health_url` — `http://<public_ip>:8080/health`
+- `alb_dns_name` — public DNS name of the API load balancer
+- `nat_public_ip` — Elastic IP for the Atlas allowlist
+- `health_url` — `http://<alb_dns_name>/health/ready`
+- `cluster_name` — ECS cluster name
+- `ecr_repository_url`, `ecr_scheduler_repository_url`, `ecr_notifications_repository_url` — image push targets
 
-Tear down when idle (avoids ongoing EC2/EBS/ECR storage cost):
-
-```powershell
-terraform destroy
-```
-
-The **state bucket** and **`terraform-deploy-role`** are operator-owned and are **not** destroyed by this stack.
-
-### Cost notes
-
-- Smallest practical instance class (`t3.micro` default); no NAT Gateway, no ALB, no DocumentDB.
-- ECR charges for storage of images; delete unused images or destroy the stack when finished studying.
-- Always destroy the EC2 environment when you are not using it.
+Publishing a new image does not deploy it. Until the CD plan, deploy with `terraform apply` and the image tag variables.
 
 ### Validate without a remote bucket
 
@@ -118,110 +117,50 @@ terraform init -backend=false
 terraform validate
 ```
 
-## First boot and image availability
+## Destroy
 
-User-data pulls `${ecr_repository_url}:${api_image_tag}` (default tag `latest`).
-
-CI already publishes an immutable `github.sha` tag alongside `latest`. First boot may still use `api_image_tag=latest`; subsequent GitHub deploys pin the running Compose stack to `github.sha` via SSM (temporary until ECS).
-
-Recommended order:
-
-1. `terraform apply` (creates ECR + EC2).
-2. Publish an image to ECR (GitHub **production** gate or local `docker push`).
-3. If the instance booted before the image existed, SSH (if enabled) or replace the instance / re-run compose:
-
-```bash
-cd /opt/taskflow
-aws ecr get-login-password --region <region> | docker login --username AWS --password-stdin <registry>
-docker compose pull
-docker compose up -d
+```powershell
+terraform destroy
 ```
 
-Publishing a new image to ECR is followed by a **temporary** SSM redeploy job (see below) that pins Compose to `github.sha`. When you migrate to ECS, remove that job and use `update-service` instead.
+`terraform destroy` removes the NAT Gateway, its Elastic IP, the ALB, the cluster, the services, the log groups, the secrets, and the ECR repositories. It does not remove Atlas, the Grafana Cloud stack, the state bucket, or `terraform-deploy-role`.
 
-## GitHub Actions → ECR publish + SSM redeploy (temporary)
+### Cost notes
 
-The workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) is a **single pipeline**:
+The NAT Gateway and the ALB bill per hour while the stack exists. `terraform destroy` stops both charges and releases the Elastic IP. A destroy that leaves the Elastic IP allocated keeps the public IPv4 charge until that address is released. ECR storage of images is included in the destroy of the repositories. Destroy the stack when the lab is idle.
+
+## GitHub Actions → ECR publish
+
+The workflow [`.github/workflows/ci.yml`](../.github/workflows/ci.yml):
 
 1. **CI** — restore / build / test on PRs and pushes.
-2. **Publish** — only on push to `main` (or `workflow_dispatch`), after CI succeeds, behind the GitHub Environment **`production`** (manual Approve).
-3. Build uses `src/TaskFlow.Api/Dockerfile`, tags with `github.sha` and `latest`, pushes to ECR via **OIDC**.
-4. **Redeploy (temporary, pre-ECS)** — SSM Run Command on the EC2 host: set `API_IMAGE=...:<github.sha>` in `/opt/taskflow/.env`, `docker compose pull` + `up -d`, then `curl` local `/health`.
+2. **Publish** — only on push to `main` (or `workflow_dispatch`), after CI succeeds, behind the GitHub Environment `production` (manual Approve).
+3. Build uses the three Dockerfiles, tags each image with `github.sha` and `latest`, and pushes to ECR via **OIDC**.
 
-User-data remains **bootstrap only**. Ongoing deploys do not rewrite user-data or replace the instance.
+Publish does not deploy. Deploy until the CD plan is `terraform apply` with the image tag variables.
 
 ### One-time GitHub + IAM setup
 
-1. Create Environment **`production`** (Settings → Environments) and add **Required reviewers** so the publish job waits for approval.
-2. Create an IAM role trusted by GitHub’s OIDC provider for this repository with:
-   - ECR **push** on `taskflow-api`
-   - `ec2:DescribeInstances` (discover instance by tags)
-   - `ssm:SendCommand`, `ssm:GetCommandInvocation` on `AWS-RunShellScript` and the TaskFlow instance
-3. After `terraform apply`, wait until the instance is **SSM Online** (Systems Manager → Fleet Manager). The instance profile includes `AmazonSSMManagedInstanceCore` and tag `TaskFlowRedeploy=enabled`.
-4. Set repository **Variables** (not committed):
+1. Create Environment `production` (Settings → Environments) and add **Required reviewers** so the publish job waits for approval.
+2. Create an IAM role trusted by GitHub’s OIDC provider for this repository with ECR **push** on `taskflow-api`, `taskflow-scheduler`, and `taskflow-notifications`.
+3. Set repository **Variables** (not committed):
 
 | Variable | Example | Required |
 |----------|---------|----------|
 | `AWS_REGION` | `us-east-1` | yes |
 | `AWS_ROLE_TO_ASSUME` | `arn:aws:iam::ACCOUNT_ID:role/github-ecr-publish` | yes |
-| `ECR_REPOSITORY` | `taskflow-api` | yes |
-| `NAME_PREFIX` | `taskflow` | no (default `taskflow`) |
-| `EC2_INSTANCE_ID` | `i-0abc...` | no (overrides tag discovery) |
+| `API_REPOSITORY` | `taskflow-api` | yes |
+| `SCHEDULER_REPOSITORY` | `taskflow-scheduler` | yes |
+| `NOTIFICATIONS_REPOSITORY` | `taskflow-notifications` | yes |
 
-Example **extra** permissions on the GitHub OIDC role (in addition to ECR push):
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "DescribeTaskFlowInstances",
-      "Effect": "Allow",
-      "Action": ["ec2:DescribeInstances"],
-      "Resource": "*"
-    },
-    {
-      "Sid": "SsmRunShellOnTaskFlow",
-      "Effect": "Allow",
-      "Action": [
-        "ssm:SendCommand",
-        "ssm:GetCommandInvocation",
-        "ssm:ListCommands",
-        "ssm:ListCommandInvocations"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
-Tighten `Resource` to your account/region/instance ARNs when you harden the lab. Until OIDC + SSM are configured, CI still runs; publish/redeploy fail at AWS auth — that is expected.
+Until OIDC is configured, CI still runs; publish fails at AWS auth — that is expected.
 
 ## Security reminders
 
-- Do not open MongoDB to the internet.
-- Prefer restricting `allowed_api_cidr` (and SSH) to your IP.
+- Do not open MongoDB, Redis, or RabbitMQ to the internet. Atlas allowlists only the NAT Elastic IP.
+- Prefer restricting `allowed_api_cidr` to your IP. The listener is HTTP on port 80.
 - Never commit `terraform.tfvars`, `backend.hcl`, or real secrets.
-- EC2 instance profile: ECR **pull** + SSM agent. GitHub OIDC role: ECR **push** + SSM SendCommand.
-
-## Future evolution: ECS
-
-Keep building the **same** API image into ECR. Later:
-
-- Replace the EC2 Compose host with an ECS task definition + **Fargate** service behind an **ALB**.
-- Move MongoDB off the app host to a managed store (or a dedicated data host).
-- **Remove** the SSM redeploy job; wire the GitHub `production` gate to an ECS **`update-service`** (or new task definition) instead.
-- Drop `AmazonSSMManagedInstanceCore` / `TaskFlowRedeploy` when the EC2 host is gone.
-- Forward application telemetry with an ADOT or Alloy sidecar to Grafana Cloud. The app already speaks OpenTelemetry; the EC2 Compose file does not run a collector. See [the Phase 4 observability design](../docs/superpowers/specs/2026-10-27-phase4-observability-design.md).
-- Point liveness at `GET /health/live` and remove `GET /health`. That includes this file's `health_url`, both Compose healthchecks, the CI curl, and the SSM redeploy curl. The API target group uses `GET /health/ready`.
-
-### Image tags: bootstrap `latest`; redeploy and ECS pin SHA
-
-**Bootstrap (user-data):** default `api_image_tag = latest` for a simple first boot if an image already exists.
-
-**SSM redeploy (temporary):** always sets `API_IMAGE` to the immutable `github.sha` tag so the running container matches the approved commit.
-
-**Future (ECS):** the running task/service **must** reference an **immutable** image identity (`:<github.sha>` or digest). Do **not** rely on `:latest` as the source of truth. Rollback = previous task-definition revision / previous SHA.
+- The Grafana header lives only on the ADOT sidecar.
 
 ## Layout
 
@@ -234,7 +173,6 @@ infra/
   backend.hcl.example
   terraform.tfvars.example
   variables.tf / outputs.tf / main.tf
-  modules/network|ecr|compute/
-  templates/user-data.sh.tpl
-  compose/docker-compose.aws.yml
+  adot/collector.yaml
+  modules/network|ecr|security|secrets|ecs/
 ```

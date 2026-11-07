@@ -209,7 +209,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 
 ## Phase 4 — Observability
 
-> Design (2026-10-27, approved): [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md). Plan: [superpowers/plans/2026-10-27-phase4-observability.md](superpowers/plans/2026-10-27-phase4-observability.md). The ECS sidecar stays open.
+> Design (2026-10-27, approved): [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md). Plan: [superpowers/plans/2026-10-27-phase4-observability.md](superpowers/plans/2026-10-27-phase4-observability.md). The ADOT sidecar is on the three .NET task definitions.
 
 The application records logs, metrics, and traces. Grafana Cloud stores them when export is turned on. Domain does not reference telemetry. `TaskId` and `UserId` stay off metric tags. Passwords, tokens, API keys, email addresses, and email bodies stay out of logs.
 
@@ -236,7 +236,26 @@ The application records logs, metrics, and traces. Grafana Cloud stores them whe
 
 ### Later, with ECS
 
-- [ ] **Sidecar on Fargate** — Not part of this phase. When ECS replaces the EC2 host, an ADOT or Alloy sidecar forwards the same OTLP signal to Grafana Cloud. The same migration points container and task liveness at `GET /health/live` (Compose, CI, SSM curl, and `health_url`) and removes `GET /health`. The API target group uses `GET /health/ready`. Task CPU and memory stay in CloudWatch.
+- [x] **Sidecar on Fargate** — An ADOT sidecar on the API, scheduler, and notifications task definitions forwards OTLP to Grafana Cloud. `essential` is false. Container health checks call `GET /health/live`. The API target group uses `GET /health/ready`. Task CPU and memory stay in CloudWatch.
+
+---
+
+## Phase 5 — ECS
+
+> Design: [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md). Plan: [superpowers/plans/2026-11-04-ecs-platform.md](superpowers/plans/2026-11-04-ecs-platform.md). Items that need a paid `terraform apply` stay open.
+
+- [ ] **Apply** — `terraform apply` produces two public subnets, two private subnets, one NAT Gateway, an ALB, and five Fargate services. No EC2 instance remains.
+- [ ] **ALB** — The ALB answers `GET /health/ready` on port 80. Only the API is registered in the target group. `allowed_api_cidr` is the listener ingress.
+- [ ] **Private paths** — API tasks reach Redis at `redis:6379` and Atlas through the NAT. Scheduler and notifications reach RabbitMQ at `rabbitmq:5672` and Atlas through the NAT. Notifications reach Brevo through the NAT.
+- [ ] **Atlas allowlist** — The Atlas allowlist contains the NAT Elastic IP and no task public IP.
+- [x] **No public data plane** — Redis and RabbitMQ have no public ingress. RabbitMQ on ECS does not run the management plugin.
+- [x] **Secrets** — JWT, the Atlas URI, the RabbitMQ password, the Brevo API key, the Brevo sender email, and the Grafana header are Secrets Manager secrets. The Grafana header is present only on the ADOT container.
+- [ ] **Export** — With the sidecar running, the three .NET services export OTLP to `localhost:4318` and the collector forwards to Grafana Cloud with `deployment.environment=aws` and `service.version` equal to the image tag.
+- [x] **Sidecar failure** — Stopping the ADOT container leaves the application container running (`essential = false`).
+- [x] **Liveness route** — `GET /health` is gone. Container health checks call `GET /health/live`. The API target group calls `GET /health/ready`. Local Compose healthchecks call `GET /health/live`.
+- [x] **EC2 removed** — `infra/compose/docker-compose.aws.yml`, the user-data template, and the compute module are deleted. The workflow no longer calls SSM.
+- [ ] **Destroy** — `terraform destroy` removes the NAT Gateway and its Elastic IP.
+- [ ] **CD plan** — Plan 2, once implemented, deploys `github.sha` to the three .NET services, ignores that image on later Terraform applies, and rolls back a bad deployment through the circuit breaker.
 
 ---
 
@@ -248,6 +267,7 @@ The application records logs, metrics, and traces. Grafana Cloud stores them whe
 | Phase 1 | MVP                         | First release         |
 | Phase 2 | CI/CD                       | GitHub Actions, ECR, Terraform/EC2 |
 | Phase 3 | Cache and Due Reminder      | Redis (done); RabbitMQ, scheduler, notifications worker, Brevo, NotificationLog receipt |
-| Phase 4 | Observability               | JSON logs, live vs ready, metrics, opt-in Grafana Cloud. Not on the current EC2 host |
+| Phase 4 | Observability               | JSON logs, live vs ready, metrics, opt-in Grafana Cloud, ADOT sidecar |
+| Phase 5 | ECS                         | Fargate, ALB, Atlas, Service Connect. Apply is an operator step |
 
-Mark items with `[x]` when done (e.g. `- [x] Domain has zero project references`). Re-check Cross-Phase Standards when adding new code in Phase 2, Phase 3, and Phase 4. The Phase 4 ECS bullet stays open until the Fargate migration.
+Mark items with `[x]` when done (e.g. `- [x] Domain has zero project references`). Re-check Cross-Phase Standards when adding new code in Phase 2, Phase 3, Phase 4, and Phase 5.

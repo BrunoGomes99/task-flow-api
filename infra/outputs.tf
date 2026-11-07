@@ -3,11 +3,6 @@ output "vpc_id" {
   value       = module.network.vpc_id
 }
 
-output "public_subnet_id" {
-  description = "ID of the public subnet."
-  value       = module.network.public_subnet_id
-}
-
 output "ecr_repository_url" {
   description = "URL of the ECR repository for the API image."
   value       = module.ecr.repository_url
@@ -28,17 +23,22 @@ output "ecr_repository_name" {
   value       = module.ecr.repository_name
 }
 
-output "public_ip" {
-  description = "Public IPv4 address of the EC2 API host."
-  value       = module.compute.public_ip
+output "alb_dns_name" {
+  description = "Public DNS name of the API load balancer."
+  value       = module.ecs.alb_dns_name
 }
 
-output "instance_id" {
-  description = "EC2 instance ID (SSM redeploy target; temporary until ECS)."
-  value       = module.compute.instance_id
+output "nat_public_ip" {
+  description = "NAT Elastic IP to place on the Atlas network access list."
+  value       = module.network.nat_public_ip
 }
 
 output "health_url" {
-  description = "Suggested health check URL for the API."
-  value       = "http://${module.compute.public_ip}:8080/health"
+  description = "API readiness URL."
+  value       = "http://${module.ecs.alb_dns_name}/health/ready"
+}
+
+output "cluster_name" {
+  description = "ECS cluster name."
+  value       = module.ecs.cluster_name
 }
