@@ -16,5 +16,9 @@ variable "adot_config" { type = string }
 variable "grafana_otlp_endpoint" { type = string }
 variable "jwt_issuer" { type = string }
 variable "jwt_audience" { type = string }
+variable "cors_allowed_origins" {
+  type    = list(string)
+  default = []
+}
 variable "rabbitmq_user" { type = string }
 variable "brevo_sender_name" { type = string }

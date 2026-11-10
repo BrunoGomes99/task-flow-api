@@ -63,6 +63,7 @@ module "ecs" {
   adot_config             = file("${path.module}/adot/collector.yaml")
   jwt_issuer              = var.jwt_issuer
   jwt_audience            = var.jwt_audience
+  cors_allowed_origins    = var.cors_allowed_origins
   rabbitmq_user           = var.rabbitmq_user
   brevo_sender_name       = var.brevo_sender_name
   api_image               = "${module.ecr.repository_url}:${var.api_image_tag}"

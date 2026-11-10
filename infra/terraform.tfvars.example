@@ -22,3 +22,4 @@ grafana_otlp_headers    = "Basic cmVwbGFjZTp0aGlz"
 # jwt_audience        = "TaskFlow.Api"
 # rabbitmq_user       = "taskflow"
 # brevo_sender_name   = "TaskFlow"
+# cors_allowed_origins = ["https://your-project.pages.dev"]

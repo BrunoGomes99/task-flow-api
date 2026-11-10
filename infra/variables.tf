@@ -44,6 +44,20 @@ variable "allowed_api_cidr" {
   }
 }
 
+variable "cors_allowed_origins" {
+  description = "Browser origins allowed to call the API. Empty allows no cross-origin browser call. Set the Cloudflare Pages origin when that hostname exists."
+  type        = list(string)
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for origin in var.cors_allowed_origins :
+      can(regex("^https?://[A-Za-z0-9.-]+(:[0-9]+)?$", origin))
+    ])
+    error_message = "Each CORS origin must be an absolute http or https origin with no path, query, or trailing slash."
+  }
+}
+
 variable "ecr_repository_name" {
   description = "Name of the ECR repository for the TaskFlow API image."
   type        = string
