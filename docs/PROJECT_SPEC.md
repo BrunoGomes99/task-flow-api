@@ -105,6 +105,7 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 - Multi-tenancy: each user accesses only their own tasks (by UserId).
 - UserId must always come from the JWT, never from request body or query.
 - **Refresh tokens** are **out of scope** for Phase 1; they may be introduced in a later version without changing the core login contract beyond additive fields (see Risks).
+- **Browser client:** a separate Angular repository calls this API. CORS for allowed origins is implemented in [superpowers/specs/2026-11-10-cors-design.md](superpowers/specs/2026-11-10-cors-design.md). HTTPS on the ALB waits for a subdomain and is [superpowers/specs/2026-11-10-alb-https-design.md](superpowers/specs/2026-11-10-alb-https-design.md). Neither change alters the login or task contract.
 
 ---
 
@@ -227,6 +228,7 @@ The EC2 Compose host is replaced by Fargate. Design: [superpowers/specs/2026-11-
 
 ## 13. Document History
 
+- **2026-11-10:** Browser CORS implemented on `feature/cors`. Allowed origins come from `Cors:AllowedOrigins`; Development allows `http://localhost:4200`. Design: [superpowers/specs/2026-11-10-cors-design.md](superpowers/specs/2026-11-10-cors-design.md). ALB HTTPS stays [superpowers/specs/2026-11-10-alb-https-design.md](superpowers/specs/2026-11-10-alb-https-design.md) and starts only after a subdomain exists.
 - **2026-11-07:** Phase 5 replaces the EC2 Compose host with Fargate. Design: [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md). Phase 4 liveness alias clarified. `GET /health` and `GET /health/live` stay equivalent in this phase, and existing curls keep `GET /health`. The ECS migration retargets those callers to `GET /health/live` and removes `GET /health`.
 - **2026-10-27:** Phase 4 observability approved, not implemented. JSON logs, liveness versus readiness, `System.Diagnostics.Metrics`, and opt-in OpenTelemetry export to Grafana Cloud. The current EC2 host stays without a collector. ECS picks up the same signal later via a sidecar. See [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md).
 - **2026-10-16:** Phase 3 messaging redefined. `NotificationLog` is the receipt for a `DueSoon` email about 24 hours before `DueDate`, sent by a notifications worker via Brevo. A scheduler worker publishes. `TaskCreated` / `TaskCompleted` publishes are dropped. ECS stays out of this phase; EC2 may move from `t3.micro` to `t3.small` if memory is short. See [superpowers/specs/2026-10-16-phase3-due-reminder-design.md](superpowers/specs/2026-10-16-phase3-due-reminder-design.md).
