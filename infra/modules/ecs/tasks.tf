@@ -19,6 +19,11 @@ locals {
         { name = "Jwt__Issuer", value = var.jwt_issuer },
         { name = "Jwt__Audience", value = var.jwt_audience },
         { name = "SERVICE_VERSION", value = var.api_image_tag },
+      ], [
+        for index, origin in var.cors_allowed_origins : {
+          name  = "Cors__AllowedOrigins__${index}"
+          value = origin
+        }
       ])
       secrets = [
         { name = "MongoDb__ConnectionString", valueFrom = var.secret_arns["atlas"] },
