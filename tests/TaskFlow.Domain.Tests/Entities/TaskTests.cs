@@ -154,14 +154,44 @@ public sealed class TaskTests
     }
 
     [Fact]
-    public void Update_ShouldApplyTitleAndDescription_WhenValid()
+    public void CanBeEdited_ShouldBeFalse_WhenCompleted()
+    {
+        var task = new DomainTask(UserId, "ABC", null, DomainTaskStatus.Completed);
+
+        Assert.False(task.CanBeEdited());
+    }
+
+    [Fact]
+    public void CanBeEdited_ShouldBeTrue_WhenNotCompleted()
+    {
+        var pending = new DomainTask(UserId, "ABC", null);
+        var inProgress = new DomainTask(UserId, "ABC", null, DomainTaskStatus.InProgress);
+
+        Assert.True(pending.CanBeEdited());
+        Assert.True(inProgress.CanBeEdited());
+    }
+
+    [Fact]
+    public void Update_ShouldApplyTitleDescriptionAndDueDate_WhenValid()
     {
         var task = new DomainTask(UserId, "ABC", "Old");
+        var dueDate = new DateTime(2026, 11, 21, 2, 59, 59, DateTimeKind.Unspecified).AddTicks(2500);
 
-        task.Update("New title here", "New desc");
+        task.Update("New title here", "New desc", dueDate);
 
         Assert.Equal("New title here", task.Title);
         Assert.Equal("New desc", task.Description);
+        Assert.Equal(new DateTime(2026, 11, 21, 2, 59, 59, DateTimeKind.Utc), task.DueDate);
+    }
+
+    [Fact]
+    public void Update_ShouldClearDueDate_WhenNull()
+    {
+        var task = new DomainTask(UserId, "ABC", null, DomainTaskStatus.Pending, new DateTime(2026, 11, 21, 2, 59, 59, DateTimeKind.Utc));
+
+        task.Update("ABC", null, null);
+
+        Assert.Null(task.DueDate);
     }
 
     [Fact]
@@ -169,6 +199,6 @@ public sealed class TaskTests
     {
         var task = new DomainTask(UserId, "ABC", null);
 
-        Assert.Throws<ArgumentOutOfRangeException>(() => task.Update("AB", null));
+        Assert.Throws<ArgumentOutOfRangeException>(() => task.Update("AB", null, null));
     }
 }

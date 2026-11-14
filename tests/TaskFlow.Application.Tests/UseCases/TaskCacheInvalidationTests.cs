@@ -21,10 +21,10 @@ public sealed class TaskCacheInvalidationTests
         var repository = new TrackingTaskRepository(events);
         await repository.AddAsync(task, CancellationToken.None);
         var invalidator = new RecordingInvalidator(events);
-        var handler = new UpdateTaskCommandHandler(repository, invalidator);
+        var handler = new UpdateTaskCommandHandler(repository, invalidator, TimeProvider.System);
 
         var result = await handler.Handle(
-            new UpdateTaskCommand(userId, task.Id, "New title", "New desc"),
+            new UpdateTaskCommand(userId, task.Id, "New title", "New desc", null),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
@@ -36,10 +36,10 @@ public sealed class TaskCacheInvalidationTests
     public async System.Threading.Tasks.Task UpdateTask_ShouldNotInvalidate_WhenTaskDoesNotExist()
     {
         var invalidator = new RecordingInvalidator([]);
-        var handler = new UpdateTaskCommandHandler(new TrackingTaskRepository([]), invalidator);
+        var handler = new UpdateTaskCommandHandler(new TrackingTaskRepository([]), invalidator, TimeProvider.System);
 
         var result = await handler.Handle(
-            new UpdateTaskCommand(Guid.NewGuid(), Guid.NewGuid(), "New title", "New desc"),
+            new UpdateTaskCommand(Guid.NewGuid(), Guid.NewGuid(), "New title", "New desc", null),
             CancellationToken.None);
 
         Assert.Equal(ErrorCodes.TaskNotFound, result.Code);

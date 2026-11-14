@@ -1,5 +1,6 @@
 using TaskFlow.Application.Common;
 using TaskFlow.Application.Common.Results;
+using TaskFlow.Application.Tests.Support;
 using TaskFlow.Application.UseCases.Tasks.CreateTask;
 using TaskFlow.Application.UseCases.Tasks.DeleteTask;
 using TaskFlow.Application.UseCases.Tasks.GetTaskById;
@@ -17,6 +18,8 @@ namespace TaskFlow.Application.Tests.UseCases;
 
 public sealed class TaskUseCasesTests
 {
+    private static readonly DateTimeOffset Now = new(2026, 11, 13, 23, 0, 0, TimeSpan.Zero);
+
     [Fact]
     public async System.Threading.Tasks.Task CreateTaskHandler_ShouldPersistAndReturnId()
     {
@@ -68,16 +71,17 @@ public sealed class TaskUseCasesTests
     }
 
     [Fact]
-    public async System.Threading.Tasks.Task UpdateTaskHandler_ShouldUpdateTitleAndDescription()
+    public async System.Threading.Tasks.Task UpdateTaskHandler_ShouldUpdateTitleDescriptionAndDueDate()
     {
         var repository = new InMemoryTaskRepository();
         var userId = Guid.NewGuid();
         var task = new DomainTask(userId, "Old", "Old desc");
         await repository.AddAsync(task, CancellationToken.None);
-        var handler = new UpdateTaskCommandHandler(repository, new NoOpTaskCacheInvalidator());
+        var handler = CreateUpdateHandler(repository);
+        var newDueDate = Now.UtcDateTime.AddDays(3);
 
         var updateResult = await handler.Handle(
-            new UpdateTaskCommand(userId, task.Id, "New", "New desc"),
+            new UpdateTaskCommand(userId, task.Id, "New", "New desc", newDueDate),
             CancellationToken.None);
 
         Assert.True(updateResult.IsSuccess);
@@ -86,7 +90,99 @@ public sealed class TaskUseCasesTests
         Assert.NotNull(updated);
         Assert.Equal("New", updated!.Title);
         Assert.Equal("New desc", updated.Description);
+        Assert.Equal(newDueDate, updated.DueDate);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateTaskHandler_ShouldKeepOverdueDate_WhenItIsNotChanged()
+    {
+        var repository = new InMemoryTaskRepository();
+        var userId = Guid.NewGuid();
+        var overdue = Now.UtcDateTime.AddDays(-2);
+        var task = new DomainTask(userId, "Overdue", null, DomainTaskStatus.Pending, overdue);
+        await repository.AddAsync(task, CancellationToken.None);
+        var handler = CreateUpdateHandler(repository);
+
+        var result = await handler.Handle(
+            new UpdateTaskCommand(userId, task.Id, "Renamed", null, overdue.AddTicks(5)),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("Renamed", task.Title);
+        Assert.Equal(overdue, task.DueDate);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateTaskHandler_ShouldRejectPastDueDate_WhenItChanges()
+    {
+        var repository = new InMemoryTaskRepository();
+        var userId = Guid.NewGuid();
+        var task = new DomainTask(userId, "Task", null, DomainTaskStatus.Pending, Now.UtcDateTime.AddDays(-2));
+        await repository.AddAsync(task, CancellationToken.None);
+        var handler = CreateUpdateHandler(repository);
+
+        var result = await handler.Handle(
+            new UpdateTaskCommand(userId, task.Id, "Renamed", null, Now.UtcDateTime.AddDays(-1)),
+            CancellationToken.None);
+
+        Assert.Equal(ApplicationResultKind.BadRequest, result.Kind);
+        Assert.Equal(ErrorCodes.TaskDueDateInPast, result.Code);
+        Assert.Equal("Task", task.Title);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateTaskHandler_ShouldRejectDueDateEqualToNow_WhenItChanges()
+    {
+        var repository = new InMemoryTaskRepository();
+        var userId = Guid.NewGuid();
+        var task = new DomainTask(userId, "Task", null);
+        await repository.AddAsync(task, CancellationToken.None);
+        var handler = CreateUpdateHandler(repository);
+
+        var result = await handler.Handle(
+            new UpdateTaskCommand(userId, task.Id, "Task", null, Now.UtcDateTime),
+            CancellationToken.None);
+
+        Assert.Equal(ErrorCodes.TaskDueDateInPast, result.Code);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateTaskHandler_ShouldClearDueDate_EvenWhenTaskIsOverdue()
+    {
+        var repository = new InMemoryTaskRepository();
+        var userId = Guid.NewGuid();
+        var task = new DomainTask(userId, "Task", null, DomainTaskStatus.Pending, Now.UtcDateTime.AddDays(-2));
+        await repository.AddAsync(task, CancellationToken.None);
+        var handler = CreateUpdateHandler(repository);
+
+        var result = await handler.Handle(
+            new UpdateTaskCommand(userId, task.Id, "Task", null, null),
+            CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Null(task.DueDate);
+    }
+
+    [Fact]
+    public async System.Threading.Tasks.Task UpdateTaskHandler_ShouldReturnLocked_WhenTaskIsCompleted()
+    {
+        var repository = new InMemoryTaskRepository();
+        var userId = Guid.NewGuid();
+        var task = new DomainTask(userId, "Done", null, DomainTaskStatus.Completed);
+        await repository.AddAsync(task, CancellationToken.None);
+        var handler = CreateUpdateHandler(repository);
+
+        var result = await handler.Handle(
+            new UpdateTaskCommand(userId, task.Id, "Changed", null, null),
+            CancellationToken.None);
+
+        Assert.Equal(ApplicationResultKind.Conflict, result.Kind);
+        Assert.Equal(ErrorCodes.TaskLocked, result.Code);
+        Assert.Equal("Done", task.Title);
+    }
+
+    private static UpdateTaskCommandHandler CreateUpdateHandler(InMemoryTaskRepository repository) =>
+        new(repository, new NoOpTaskCacheInvalidator(), new FixedTimeProvider(Now));
 
     [Fact]
     public async System.Threading.Tasks.Task UpdateTaskStatusHandler_ShouldSetStatusUsingDomainRules()

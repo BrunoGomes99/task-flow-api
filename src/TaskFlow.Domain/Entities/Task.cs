@@ -34,6 +34,8 @@ public class Task : AggregateRoot
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
+    public bool CanBeEdited() => Status != Enums.TaskStatus.Completed;
+
     public Task(
         Guid userId,
         string title,
@@ -68,17 +70,19 @@ public class Task : AggregateRoot
     }
 
     /// <summary>
-    /// Updates the task title and description. Validates the new values before applying.
+    /// Updates the task title, description and replaces due date. Validates the new values before applying.
     /// </summary>
     /// <param name="title">The new title.</param>
     /// <param name="description">The new description (null is treated as empty).</param>
-    public void Update(string title, string? description)
+    /// <param name="dueDate">The new due date (null clears it).</param>
+    public void Update(string title, string? description, DateTime? dueDate)
     {
         description ??= string.Empty;
         Validate(title, description);
 
         Title = title;
         Description = description;
+        DueDate = UtcInstant.Normalize(dueDate);
         UpdatedAt = DateTime.UtcNow;
     }
 

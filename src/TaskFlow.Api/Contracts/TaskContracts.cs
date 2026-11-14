@@ -9,7 +9,7 @@ public sealed record CreateTaskRequest(
     DomainTaskStatus Status = DomainTaskStatus.Pending,
     DateTime? DueDate = null);
 
-public sealed record UpdateTaskRequest(string Title, string? Description);
+public sealed record UpdateTaskRequest(string Title, string? Description, DateTime? DueDate = null);
 
 public sealed record UpdateTaskStatusRequest(DomainTaskStatus Status);
 

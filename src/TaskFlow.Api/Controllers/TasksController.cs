@@ -91,6 +91,7 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(
         Guid taskId,
         [FromBody] UpdateTaskRequest request,
@@ -98,7 +99,7 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
     {
         var userId = User.GetUserId();
         var result = await mediator.Send(
-            new UpdateTaskCommand(userId, taskId, request.Title, request.Description),
+            new UpdateTaskCommand(userId, taskId, request.Title, request.Description, request.DueDate),
             cancellationToken);
 
         return FromResult(result);
