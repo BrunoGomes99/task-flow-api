@@ -38,7 +38,7 @@ All three statuses are always present, zero when empty. The count is a MongoDB `
 
 ### D4 — Completed tasks are locked
 
-`PUT /api/tasks/{id}` on a `completed` task returns `409` with code `task.locked`. The entity exposes `CanBeEdited`; the handler translates `false` into the conflict. Delete is still allowed.
+`PUT /api/tasks/{id}` on a `completed` task returns `409` with code `task.locked`. The entity exposes `CanBeEdited()`; the handler translates `false` into the conflict. Delete is still allowed.
 
 Order of checks: `404 task.not_found`, then `409 task.locked`, then the due date rule (D5).
 
@@ -49,7 +49,7 @@ The rule is `dueDate > UtcNow`.
 - **Create:** checked by `CreateTaskCommandValidator` when `dueDate` is present.
 - **Update:** checked by the handler, only when the new value differs from the stored value. The task stores its due date through `UtcInstant.Normalize` (UTC, truncated to milliseconds, as MongoDB stores it), and the handler compares against that. `DueInstant` delegates to the same method. An overdue task whose date is sent back unchanged is saved. Clearing the date is always allowed.
 
-A violation returns `400 request.validation_failed` with `errors.DueDate`, the same shape as any other field error. The clock is the injected `TimeProvider`.
+On create, a violation returns `400 request.validation_failed` with `errors.DueDate`, the same shape as any other field error. On update, the handler returns `Result.BadRequest`: `400` with code `task.due_date_in_past` and the message in `detail`. Handlers do not throw. The clock is the injected `TimeProvider`.
 
 ### D6 — Tasks without a due date are last
 
@@ -81,10 +81,10 @@ The legibility of the logo on the purple e-mail header (`#5211A5`) must be check
 
 ## Success criteria
 
-- [ ] `GET /api/tasks/summary` returns the three statuses and the total, zero when empty.
+- [x] `GET /api/tasks/summary` returns the three statuses and the total, zero when empty.
 - [ ] `POST /api/tasks` creates `pending` tasks and rejects a past `dueDate` with `errors.DueDate`.
-- [ ] `PUT /api/tasks/{id}` changes and clears `dueDate`; an unchanged overdue date is accepted; a changed past date is rejected.
-- [ ] `PUT /api/tasks/{id}` on a completed task returns `409 task.locked`.
+- [x] `PUT /api/tasks/{id}` changes and clears `dueDate`; an unchanged overdue date is accepted; a changed past date is rejected.
+- [x] `PUT /api/tasks/{id}` on a completed task returns `409 task.locked`.
 - [ ] Tasks without a due date are last in both orders, and pagination is stable.
 - [ ] OpenAPI enums are camelCase strings.
 - [ ] The reminder e-mail is HTML, shows the date in `America/Sao_Paulo`, encodes the title, and links to the task.
