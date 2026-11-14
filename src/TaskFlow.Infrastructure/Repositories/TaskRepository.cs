@@ -87,6 +87,19 @@ public sealed class TaskRepository : ITaskRepository
         return new PagedResult<DomainTask>(items, pageNumber, pageSize, totalCount);
     }
 
+    public async Task<IReadOnlyDictionary<DomainTaskStatus, int>> CountByStatusAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default)
+    {
+        var groups = await _tasks
+            .Aggregate()
+            .Match(x => x.UserId == userId)
+            .Group(x => x.Status, g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        return groups.ToDictionary(g => g.Status, g => g.Count);
+    }
+
     private static BsonRegularExpression ContainsInsensitive(string value) =>
         new(Regex.Escape(value), "i");
 }

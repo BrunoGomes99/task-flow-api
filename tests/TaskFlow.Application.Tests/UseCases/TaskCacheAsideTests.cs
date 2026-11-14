@@ -111,6 +111,11 @@ public sealed class TaskCacheAsideTests
             DueDateOrder dueDateOrder,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public System.Threading.Tasks.Task<IReadOnlyDictionary<DomainTaskStatus, int>> CountByStatusAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 
     private sealed class InMemoryTaskRepository : ITaskRepository
@@ -143,6 +148,11 @@ public sealed class TaskCacheAsideTests
             string? descriptionContains,
             DomainTaskStatus? status,
             DueDateOrder dueDateOrder,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public System.Threading.Tasks.Task<IReadOnlyDictionary<DomainTaskStatus, int>> CountByStatusAsync(
+            Guid userId,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
     }

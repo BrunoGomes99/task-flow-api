@@ -59,4 +59,13 @@ public interface ITaskRepository
         DomainTaskStatus? status,
         DueDateOrder dueDateOrder,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts all the user's tasks per status. Statuses without tasks may be absent from the result.
+    /// </summary>
+    /// <param name="userId">The owner user id (from JWT).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    System.Threading.Tasks.Task<IReadOnlyDictionary<DomainTaskStatus, int>> CountByStatusAsync(
+        Guid userId,
+        CancellationToken cancellationToken = default);
 }

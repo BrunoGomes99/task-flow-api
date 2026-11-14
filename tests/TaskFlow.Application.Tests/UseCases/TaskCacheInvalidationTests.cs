@@ -175,5 +175,10 @@ public sealed class TaskCacheInvalidationTests
             DueDateOrder dueDateOrder,
             CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
+
+        public System.Threading.Tasks.Task<IReadOnlyDictionary<DomainTaskStatus, int>> CountByStatusAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
     }
 }

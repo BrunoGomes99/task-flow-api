@@ -3,6 +3,7 @@ using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.UseCases.Tasks.CreateTask;
 using TaskFlow.Application.UseCases.Tasks.DeleteTask;
 using TaskFlow.Application.UseCases.Tasks.GetTaskById;
+using TaskFlow.Application.UseCases.Tasks.GetTaskSummary;
 using TaskFlow.Application.UseCases.Tasks.ListTasks;
 using TaskFlow.Application.UseCases.Tasks.UpdateTask;
 using TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
@@ -123,6 +124,25 @@ public sealed class TaskUseCasesTests
         Assert.Null(existing);
     }
 
+    [Fact]
+    public async System.Threading.Tasks.Task GetTaskSummaryHandler_ShouldCountPerStatus_AndReportMissingStatusesAsZero()
+    {
+        var repository = new InMemoryTaskRepository();
+        var userId = Guid.NewGuid();
+        await repository.AddAsync(new DomainTask(userId, "One", null), CancellationToken.None);
+        await repository.AddAsync(new DomainTask(userId, "Two", null), CancellationToken.None);
+        var inProgress = new DomainTask(userId, "Three", null);
+        inProgress.TryChangeStatusTo(DomainTaskStatus.InProgress, out _);
+        await repository.AddAsync(inProgress, CancellationToken.None);
+        await repository.AddAsync(new DomainTask(Guid.NewGuid(), "Other user", null), CancellationToken.None);
+        var handler = new GetTaskSummaryQueryHandler(repository);
+
+        var result = await handler.Handle(new GetTaskSummaryQuery(userId), CancellationToken.None);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(new TaskSummaryDto(Pending: 2, InProgress: 1, Completed: 0, Total: 3), result.Value);
+    }
+
     private sealed class NoOpTaskCacheInvalidator : ITaskCacheInvalidator
     {
         public System.Threading.Tasks.Task InvalidateAsync(Guid userId, Guid taskId, CancellationToken cancellationToken = default)
@@ -197,6 +217,17 @@ public sealed class TaskUseCasesTests
             var items = query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();
             var paged = new PagedResult<DomainTask>(items, pageNumber, pageSize, total);
             return System.Threading.Tasks.Task.FromResult(paged);
+        }
+
+        public System.Threading.Tasks.Task<IReadOnlyDictionary<DomainTaskStatus, int>> CountByStatusAsync(
+            Guid userId,
+            CancellationToken cancellationToken = default)
+        {
+            IReadOnlyDictionary<DomainTaskStatus, int> counts = _items
+                .Where(x => x.UserId == userId)
+                .GroupBy(x => x.Status)
+                .ToDictionary(g => g.Key, g => g.Count());
+            return System.Threading.Tasks.Task.FromResult(counts);
         }
     }
 }

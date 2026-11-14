@@ -8,6 +8,7 @@ using TaskFlow.Application.DTOs;
 using TaskFlow.Application.UseCases.Tasks.CreateTask;
 using TaskFlow.Application.UseCases.Tasks.DeleteTask;
 using TaskFlow.Application.UseCases.Tasks.GetTaskById;
+using TaskFlow.Application.UseCases.Tasks.GetTaskSummary;
 using TaskFlow.Application.UseCases.Tasks.ListTasks;
 using TaskFlow.Application.UseCases.Tasks.UpdateTask;
 using TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
@@ -39,6 +40,17 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
                 query.Status,
                 query.DueDateOrder),
             cancellationToken);
+
+        return FromResult(result);
+    }
+
+    [HttpGet("summary")]
+    [ProducesResponseType(typeof(TaskSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Summary(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var result = await mediator.Send(new GetTaskSummaryQuery(userId), cancellationToken);
 
         return FromResult(result);
     }

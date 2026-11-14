@@ -80,4 +80,33 @@ public sealed class TaskRepositoryTests
         Assert.True(deletedWithOwner);
         Assert.Null(existing);
     }
+
+    [Fact]
+    public async System.Threading.Tasks.Task CountByStatusAsync_ShouldCountOnlyTheUsersTasksPerStatus()
+    {
+        var repository = CreateRepository("taskflow-summary");
+        var userId = Guid.NewGuid();
+
+        await repository.AddAsync(new DomainTask(userId, "Pending one", null));
+        await repository.AddAsync(new DomainTask(userId, "Pending two", null));
+        await repository.AddAsync(new DomainTask(userId, "Done", null, DomainTaskStatus.Completed));
+        await repository.AddAsync(new DomainTask(Guid.NewGuid(), "Other user", null, DomainTaskStatus.InProgress));
+
+        var counts = await repository.CountByStatusAsync(userId, CancellationToken.None);
+
+        Assert.Equal(2, counts[DomainTaskStatus.Pending]);
+        Assert.Equal(1, counts[DomainTaskStatus.Completed]);
+        Assert.False(counts.ContainsKey(DomainTaskStatus.InProgress));
+    }
+
+    private TaskRepository CreateRepository(string databasePrefix)
+    {
+        var settings = new MongoDbSettings
+        {
+            ConnectionString = _mongoDb.ConnectionString,
+            DatabaseName = $"{databasePrefix}-{Guid.NewGuid():N}"
+        };
+
+        return new TaskRepository(new TaskFlowMongoContext(settings));
+    }
 }
