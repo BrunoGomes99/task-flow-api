@@ -38,7 +38,7 @@ All three statuses are always present, zero when empty. The count is a MongoDB `
 
 ### D4 — Completed tasks are locked
 
-`PUT /api/tasks/{id}` on a `completed` task returns `409` with code `task.locked`. Delete is still allowed.
+`PUT /api/tasks/{id}` on a `completed` task returns `409` with code `task.locked`. The entity exposes `CanBeEdited`; the handler translates `false` into the conflict. Delete is still allowed.
 
 Order of checks: `404 task.not_found`, then `409 task.locked`, then the due date rule (D5).
 
@@ -47,7 +47,7 @@ Order of checks: `404 task.not_found`, then `409 task.locked`, then the due date
 The rule is `dueDate > UtcNow`.
 
 - **Create:** checked by `CreateTaskCommandValidator` when `dueDate` is present.
-- **Update:** checked by the handler, only when the new value differs from the stored value. Both values are compared after `DueInstant.NormalizeUtc` (UTC, truncated to milliseconds, as MongoDB stores it). An overdue task whose date is sent back unchanged is saved. Clearing the date is always allowed.
+- **Update:** checked by the handler, only when the new value differs from the stored value. The task stores its due date through `UtcInstant.Normalize` (UTC, truncated to milliseconds, as MongoDB stores it), and the handler compares against that. `DueInstant` delegates to the same method. An overdue task whose date is sent back unchanged is saved. Clearing the date is always allowed.
 
 A violation returns `400 request.validation_failed` with `errors.DueDate`, the same shape as any other field error. The clock is the injected `TimeProvider`.
 

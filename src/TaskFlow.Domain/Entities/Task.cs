@@ -1,6 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using TaskFlow.Domain.SeedWork;
+using TaskFlow.Domain.Time;
 using TaskFlow.Domain.Validation;
 
 namespace TaskFlow.Domain.Entities;
@@ -47,7 +48,7 @@ public class Task : AggregateRoot
         Title = title;
         Description = description;
         Status = status;
-        DueDate = dueDate;
+        DueDate = UtcInstant.Normalize(dueDate);
         var now = DateTime.UtcNow;
         CreatedAt = now;
         UpdatedAt = now;

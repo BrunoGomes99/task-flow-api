@@ -2,6 +2,7 @@ using System.Reflection;
 using DomainTask = TaskFlow.Domain.Entities.Task;
 using TaskEntity = TaskFlow.Domain.Entities.Task;
 using TaskFlow.Domain.SeedWork;
+using TaskFlow.Domain.Time;
 using TaskFlow.Infrastructure.Persistence.Documents;
 
 namespace TaskFlow.Infrastructure.Persistence.Mappers;
@@ -19,7 +20,7 @@ internal static class TaskDocumentMapper
             Title = task.Title,
             Description = task.Description,
             Status = task.Status,
-            DueDate = task.DueDate is null ? null : EnsureUtc(task.DueDate.Value),
+            DueDate = UtcInstant.Normalize(task.DueDate),
             CreatedAt = EnsureUtc(task.CreatedAt),
             UpdatedAt = EnsureUtc(task.UpdatedAt)
         };
@@ -34,7 +35,7 @@ internal static class TaskDocumentMapper
             document.Title,
             document.Description,
             document.Status,
-            document.DueDate is null ? null : EnsureUtc(document.DueDate.Value));
+            UtcInstant.Normalize(document.DueDate));
 
         SetProperty(task, nameof(Entity.Id), document.Id);
         SetProperty(task, nameof(TaskEntity.CreatedAt), EnsureUtc(document.CreatedAt));

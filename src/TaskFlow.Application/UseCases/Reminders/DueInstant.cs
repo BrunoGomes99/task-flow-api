@@ -1,3 +1,5 @@
+using TaskFlow.Domain.Time;
+
 namespace TaskFlow.Application.UseCases.Reminders;
 
 /// <summary>
@@ -6,16 +8,5 @@ namespace TaskFlow.Application.UseCases.Reminders;
 /// </summary>
 public static class DueInstant
 {
-    public static DateTime NormalizeUtc(DateTime value)
-    {
-        var utc = value.Kind switch
-        {
-            DateTimeKind.Utc => value,
-            DateTimeKind.Local => value.ToUniversalTime(),
-            _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
-        };
-
-        var ticks = utc.Ticks - (utc.Ticks % TimeSpan.TicksPerMillisecond);
-        return new DateTime(ticks, DateTimeKind.Utc);
-    }
+    public static DateTime NormalizeUtc(DateTime value) => UtcInstant.Normalize(value);
 }

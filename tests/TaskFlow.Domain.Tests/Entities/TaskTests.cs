@@ -26,6 +26,17 @@ public sealed class TaskTests
     }
 
     [Fact]
+    public void Constructor_ShouldStoreDueDateAsUtcTruncatedToMilliseconds()
+    {
+        var dueDate = new DateTime(2026, 11, 21, 2, 59, 59, DateTimeKind.Unspecified).AddTicks(2500);
+
+        var task = new DomainTask(UserId, "ABC", null, DomainTaskStatus.Pending, dueDate);
+
+        Assert.Equal(DateTimeKind.Utc, task.DueDate!.Value.Kind);
+        Assert.Equal(new DateTime(2026, 11, 21, 2, 59, 59, DateTimeKind.Utc), task.DueDate);
+    }
+
+    [Fact]
     public void Constructor_ShouldTreatNullDescriptionAsEmpty()
     {
         var task = new DomainTask(UserId, "ABC", null);
