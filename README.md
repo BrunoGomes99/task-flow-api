@@ -61,7 +61,7 @@ The API will listen on the configured port (e.g. `http://localhost:5000`).
 docker-compose up -d
 ```
 
-Starts the API, MongoDB, Redis, RabbitMQ, and the scheduler and notifications workers. Redis port `6379` and AMQP port `5672` are not published. The API reaches Redis as `redis:6379`. RabbitMQ management UI: `http://localhost:15672` (user and password from `.env`). Set `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in `.env` or the notifications worker will not stay up. Health check: `GET /health/live`. A Redis outage does not fail get-by-id: the handler reads MongoDB. Local Compose also starts Redis Commander at `http://localhost:8083` (basic auth from `.env`) to browse cache keys. That UI is not part of the AWS stack.
+Starts the API, MongoDB, Redis, RabbitMQ, and the scheduler and notifications workers. Redis port `6379` and AMQP port `5672` are not published. The API reaches Redis as `redis:6379`. RabbitMQ management UI: `http://localhost:15672` (user and password from `.env`). Set `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `REMINDER_EMAIL_LOGO_URL` in `.env` or the notifications worker will not stay up. `REMINDER_EMAIL_WEB_BASE_URL` defaults to `http://localhost:4200`. Health check: `GET /health/live`. A Redis outage does not fail get-by-id: the handler reads MongoDB. Local Compose also starts Redis Commander at `http://localhost:8083` (basic auth from `.env`) to browse cache keys. That UI is not part of the AWS stack.
 
 ### Run tests
 

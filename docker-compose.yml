@@ -128,6 +128,8 @@ services:
       Brevo__ApiKey: ${BREVO_API_KEY:-}
       Brevo__SenderEmail: ${BREVO_SENDER_EMAIL:-}
       Brevo__SenderName: ${BREVO_SENDER_NAME:-TaskFlow}
+      ReminderEmail__WebBaseUrl: ${REMINDER_EMAIL_WEB_BASE_URL:-http://localhost:4200}
+      ReminderEmail__LogoUrl: ${REMINDER_EMAIL_LOGO_URL:-}
     depends_on:
       mongo:
         condition: service_healthy

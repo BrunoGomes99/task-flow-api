@@ -64,7 +64,7 @@ The JSON already uses `JsonStringEnumConverter(JsonNamingPolicy.CamelCase)`. The
 - The template is an embedded resource in Infrastructure. Every placeholder value is HTML-encoded. The task title comes from the user.
 - Brevo receives `htmlContent` and `textContent`.
 - The due date is shown as `dd/MM/yyyy` in `America/Sao_Paulo`. `2026-11-21T02:59:59Z` is shown as `20/11/2026`.
-- The button links to `{ReminderEmail:WebBaseUrl}/tasks/{taskId}`. Development uses `http://localhost:4200`.
+- The button links to `{ReminderEmail:WebBaseUrl}`. Development uses `http://localhost:4200`. A `/tasks/{taskId}` link would land on login for a signed-out reader, so the mail opens the app root.
 - The logo is a public PNG referenced by URL (`ReminderEmail:LogoUrl`). Inline CID images and data URIs are not used: Brevo has no reliable inline attachment, and Gmail blocks data URIs.
 
 ### D9 — Logo in a public S3 bucket
@@ -86,6 +86,6 @@ The legibility of the logo on the purple e-mail header (`#5211A5`) must be check
 - [x] `PUT /api/tasks/{id}` changes and clears `dueDate`; an unchanged overdue date is accepted; a changed past date is rejected.
 - [x] `PUT /api/tasks/{id}` on a completed task returns `409 task.locked`.
 - [x] Tasks without a due date are last in both orders, and pagination is stable.
-- [ ] OpenAPI enums are camelCase strings.
-- [ ] The reminder e-mail is HTML, shows the date in `America/Sao_Paulo`, encodes the title, and links to the task.
+- [x] OpenAPI enums are camelCase strings.
+- [x] The reminder e-mail is HTML, shows the date in `America/Sao_Paulo`, encodes the title, and links to the app root.
 - [ ] Terraform publishes the logo under `email/*` and passes its URL to the notifications task.
