@@ -119,12 +119,15 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 
 ### Task
 
-4. Create task
+4. Create task (always `Pending`; a due date in the past is rejected)
 5. Get task by Id
 6. List tasks (paginated, filtered, ordered)
-7. Update task
+7. Update task (title, description and due date; a completed task is locked; a past due date is rejected only when it changes)
 8. Update task status (PATCH)
 9. Delete task
+10. Task summary (count per status, ignoring filters)
+
+Frontend prerequisites design: [superpowers/specs/2026-11-13-frontend-prereqs-design.md](superpowers/specs/2026-11-13-frontend-prereqs-design.md).
 
 ---
 
@@ -134,7 +137,7 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 - Multi-tenancy enforced in the application layer.
 - **Pagination:** PageNumber, PageSize (max **20**).
 - **Filtering:** title contains, description contains, status.
-- **Ordering:** DueDate ASC/DESC.
+- **Ordering:** tasks with a due date first, then DueDate ASC/DESC. Ties break by CreatedAt descending and id ascending, so pages stay stable.
 - Global exception-handling middleware.
 - Clear separation of concerns and logging.
 - **Observability (Phase 4):** JSON logs correlated with `traceId`, liveness versus readiness, application metrics, and opt-in OpenTelemetry export to Grafana Cloud. Not deployed on the current EC2 host. Design: [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md).
@@ -228,6 +231,9 @@ The EC2 Compose host is replaced by Fargate. Design: [superpowers/specs/2026-11-
 
 ## 13. Document History
 
+- **2026-11-15:** `GET /api/tasks` lists tasks without a due date last in both orders. Pages that share a due date stay stable: newer tasks come first, then the smaller id.
+- **2026-11-13:** `POST /api/tasks` no longer accepts a status. Tasks are created as `Pending`, and a past due date returns `400 request.validation_failed` with `errors.DueDate`.
+- **2026-11-13:** Frontend prerequisites started on `feature/frontend-prereqs`. Done so far: task summary endpoint, due dates stored as normalized UTC, and an editable, clearable due date. A completed task returns `409 task.locked`. A past due date on update returns `400 task.due_date_in_past` only when the date changes. Design: [superpowers/specs/2026-11-13-frontend-prereqs-design.md](superpowers/specs/2026-11-13-frontend-prereqs-design.md).
 - **2026-11-10:** Browser CORS implemented on `feature/cors`. Allowed origins come from `Cors:AllowedOrigins`; Development allows `http://localhost:4200`. Design: [superpowers/specs/2026-11-10-cors-design.md](superpowers/specs/2026-11-10-cors-design.md). ALB HTTPS stays [superpowers/specs/2026-11-10-alb-https-design.md](superpowers/specs/2026-11-10-alb-https-design.md) and starts only after a subdomain exists.
 - **2026-11-07:** Phase 5 replaces the EC2 Compose host with Fargate. Design: [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md). Phase 4 liveness alias clarified. `GET /health` and `GET /health/live` stay equivalent in this phase, and existing curls keep `GET /health`. The ECS migration retargets those callers to `GET /health/live` and removes `GET /health`.
 - **2026-10-27:** Phase 4 observability approved, not implemented. JSON logs, liveness versus readiness, `System.Diagnostics.Metrics`, and opt-in OpenTelemetry export to Grafana Cloud. The current EC2 host stays without a collector. ECS picks up the same signal later via a sidecar. See [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md).

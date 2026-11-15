@@ -42,7 +42,14 @@ public static class DueReminderServiceCollectionExtensions
         if (string.IsNullOrWhiteSpace(brevo.SenderName))
             brevo.SenderName = "TaskFlow";
 
+        var reminderEmail = configuration.GetSection(ReminderEmailSettings.SectionName).Get<ReminderEmailSettings>()
+            ?? new ReminderEmailSettings();
+        RequireAbsoluteHttpUrl(reminderEmail.WebBaseUrl, "ReminderEmail:WebBaseUrl");
+        RequireAbsoluteHttpUrl(reminderEmail.LogoUrl, "ReminderEmail:LogoUrl");
+
         services.AddSingleton(brevo);
+        services.AddSingleton(reminderEmail);
+        services.AddSingleton<ReminderEmailRenderer>();
         services.AddHttpClient<IEmailSender, BrevoEmailSender>(client =>
         {
             client.BaseAddress = new Uri("https://api.brevo.com/");
@@ -63,5 +70,14 @@ public static class DueReminderServiceCollectionExtensions
             throw new InvalidOperationException("RabbitMq:Port must be a positive number.");
 
         return settings;
+    }
+
+    private static void RequireAbsoluteHttpUrl(string? value, string name)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri)
+            || (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            throw new InvalidOperationException($"{name} must be an absolute http or https URL.");
+        }
     }
 }

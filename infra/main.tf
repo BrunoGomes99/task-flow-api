@@ -38,6 +38,13 @@ module "security" {
   allowed_api_cidr = var.allowed_api_cidr
 }
 
+module "s3" {
+  source = "./modules/s3"
+
+  name_prefix = var.name_prefix
+  logo_path   = "${path.module}/assets/email/logo.png"
+}
+
 module "secrets" {
   source = "./modules/secrets"
 
@@ -66,6 +73,8 @@ module "ecs" {
   cors_allowed_origins    = var.cors_allowed_origins
   rabbitmq_user           = var.rabbitmq_user
   brevo_sender_name       = var.brevo_sender_name
+  web_base_url            = var.web_base_url
+  reminder_email_logo_url = module.s3.logo_url
   api_image               = "${module.ecr.repository_url}:${var.api_image_tag}"
   scheduler_image         = "${module.ecr_scheduler.repository_url}:${var.scheduler_image_tag}"
   notifications_image     = "${module.ecr_notifications.repository_url}:${var.notifications_image_tag}"

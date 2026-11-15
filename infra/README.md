@@ -9,6 +9,7 @@ Terraform for a destroyable AWS study environment. Fargate replaces the old EC2 
 | `modules/security` | Security groups for the ALB, API, scheduler, notifications, Redis, and RabbitMQ |
 | `modules/secrets` | Secrets Manager entries for Atlas, JWT, RabbitMQ, Brevo, and the Grafana header |
 | `modules/ecs` | Fargate cluster, Service Connect namespace `taskflow`, five services, and the API load balancer |
+| `modules/s3` | Bucket for the reminder logo. Only `email/*` is publicly readable, and Terraform uploads `assets/email/logo.png` |
 
 Tasks have no public IP. The ALB is the only public entry and it reaches only the API, on port 80. Redis is reached as `redis:6379`. RabbitMQ is reached as `rabbitmq:5672` and does not run the management plugin. MongoDB is an Atlas M0 cluster that Terraform does not create.
 
@@ -36,6 +37,7 @@ Copy-Item terraform.tfvars.example terraform.tfvars
 #   rabbitmq_password         = "..."
 #   brevo_api_key             = "..."
 #   brevo_sender_email        = "you@example.com"
+#   web_base_url              = "https://your-project.pages.dev"
 #   grafana_otlp_endpoint     = "https://..."
 #   grafana_otlp_headers      = "Basic <base64>"
 ```
@@ -52,6 +54,7 @@ Copy-Item terraform.tfvars.example terraform.tfvars
 | `rabbitmq_password` | yes | Sensitive; letters and digits, min 12 |
 | `brevo_api_key` | yes | Sensitive |
 | `brevo_sender_email` | yes | Verified Brevo sender |
+| `web_base_url` | yes | Absolute http(s) origin of the web app, with no path or trailing slash. Notifications receive it as `ReminderEmail__WebBaseUrl` |
 | `grafana_otlp_endpoint` | yes | Grafana Cloud OTLP base URL, `https://`, no signal path |
 | `grafana_otlp_headers` | yes | Sensitive; `Basic <base64>`, without an `Authorization=` prefix |
 | `aws_region` | no | Default `us-east-1` |
@@ -106,6 +109,7 @@ Useful outputs after apply:
 - `nat_public_ip` — Elastic IP for the Atlas allowlist
 - `health_url` — `http://<alb_dns_name>/health/ready`
 - `cluster_name` — ECS cluster name
+- `reminder_email_logo_url` — public URL of `email/logo.png`, injected into notifications as `ReminderEmail__LogoUrl`
 - `ecr_repository_url`, `ecr_scheduler_repository_url`, `ecr_notifications_repository_url` — image push targets
 
 Publishing a new image deploys it with `ecs update-service` on the three .NET services. See [GitHub Actions deploy](#github-actions-deploy).
@@ -123,7 +127,7 @@ terraform validate
 terraform destroy
 ```
 
-`terraform destroy` removes the NAT Gateway, its Elastic IP, the ALB, the cluster, the services, the log groups, the secrets, and the ECR repositories. It does not remove Atlas, the Grafana Cloud stack, the state bucket, or `terraform-deploy-role`.
+`terraform destroy` removes the NAT Gateway, its Elastic IP, the ALB, the cluster, the services, the log groups, the secrets, the email-asset bucket, and the ECR repositories. It does not remove Atlas, the Grafana Cloud stack, the state bucket, or `terraform-deploy-role`.
 
 ### Cost notes
 
@@ -184,6 +188,8 @@ ECR push permissions stay.
 - Prefer restricting `allowed_api_cidr` to your IP. The listener is HTTP on port 80.
 - Never commit `terraform.tfvars`, `backend.hcl`, or real secrets.
 - The Grafana header lives only on the ADOT sidecar.
+- The email bucket allows anonymous `s3:GetObject` only under `email/*`. ACLs stay disabled. An account-level S3 Block Public Access setting still overrides this policy.
+- `assets/email/logo.png` is the full TaskFlow logo (symbol and name, transparent background). Terraform uploads that file as `email/logo.png`. Confirm it stays legible on the reminder header `#5211A5` before the first deploy.
 
 ## Layout
 
@@ -197,5 +203,6 @@ infra/
   terraform.tfvars.example
   variables.tf / outputs.tf / main.tf
   adot/collector.yaml
-  modules/network|ecr|security|secrets|ecs/
+  assets/email/logo.png
+  modules/network|ecr|security|secrets|ecs|s3/
 ```

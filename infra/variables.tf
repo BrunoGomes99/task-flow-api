@@ -154,6 +154,16 @@ variable "brevo_sender_name" {
   default     = "TaskFlow"
 }
 
+variable "web_base_url" {
+  description = "Absolute origin of the web app, passed to notifications as ReminderEmail__WebBaseUrl. The reminder button opens this root."
+  type        = string
+
+  validation {
+    condition     = can(regex("^https?://[A-Za-z0-9.-]+(:[0-9]+)?$", var.web_base_url))
+    error_message = "web_base_url must be an absolute http or https origin with no path, query, or trailing slash."
+  }
+}
+
 variable "atlas_connection_string" {
   description = "Atlas connection string, including credentials. Do not commit real values."
   type        = string

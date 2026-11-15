@@ -2,6 +2,7 @@ using MediatR;
 using TaskFlow.Application.Common.Results;
 using TaskFlow.Application.Interfaces;
 using DomainTask = TaskFlow.Domain.Entities.Task;
+using DomainTaskStatus = TaskFlow.Domain.Enums.TaskStatus;
 
 namespace TaskFlow.Application.UseCases.Tasks.CreateTask;
 
@@ -23,7 +24,7 @@ public sealed class CreateTaskCommandHandler : IRequestHandler<CreateTaskCommand
             request.UserId,
             request.Title,
             request.Description,
-            request.Status,
+            DomainTaskStatus.Pending,
             request.DueDate);
 
         await _taskRepository.AddAsync(task, cancellationToken);

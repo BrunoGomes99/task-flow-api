@@ -42,7 +42,7 @@ public sealed class DueSoonReminderTests
     }
 
     [Fact]
-    public void Email_UsesPortugueseSubjectAndUtcDueInstant()
+    public void Email_UsesPortugueseSubjectAndNormalizedDueInstant()
     {
         var due = new DateTime(2026, 10, 17, 18, 30, 0, DateTimeKind.Utc);
 
@@ -50,7 +50,8 @@ public sealed class DueSoonReminderTests
 
         Assert.Equal("ana@example.com", email.To);
         Assert.Equal("Lembrete: Relatório vence em cerca de 24 horas", email.Subject);
-        Assert.Equal("A tarefa \"Relatório\" vence em 2026-10-17 18:30 UTC.", email.Body);
+        Assert.Equal("Relatório", email.Title);
+        Assert.Equal(DueInstant.NormalizeUtc(due), email.DueDateUtc);
     }
 
     [Fact]

@@ -13,6 +13,8 @@ public static class ErrorCodes
 
     public const string TaskNotFound = "task.not_found";
     public const string TaskStatusTransitionInvalid = "task.status_transition_invalid";
+    public const string TaskLocked = "task.locked";
+    public const string TaskDueDateInPast = "task.due_date_in_past";
 
     public const string RequestValidationFailed = "request.validation_failed";
     public const string RequestInvalidArgument = "request.invalid_argument";
