@@ -85,7 +85,7 @@ The legibility of the logo on the purple e-mail header (`#5211A5`) must be check
 - [x] `POST /api/tasks` creates `pending` tasks and rejects a past `dueDate` with `errors.DueDate`.
 - [x] `PUT /api/tasks/{id}` changes and clears `dueDate`; an unchanged overdue date is accepted; a changed past date is rejected.
 - [x] `PUT /api/tasks/{id}` on a completed task returns `409 task.locked`.
-- [ ] Tasks without a due date are last in both orders, and pagination is stable.
+- [x] Tasks without a due date are last in both orders, and pagination is stable.
 - [ ] OpenAPI enums are camelCase strings.
 - [ ] The reminder e-mail is HTML, shows the date in `America/Sao_Paulo`, encodes the title, and links to the task.
 - [ ] Terraform publishes the logo under `email/*` and passes its URL to the notifications task.

@@ -137,7 +137,7 @@ Frontend prerequisites design: [superpowers/specs/2026-11-13-frontend-prereqs-de
 - Multi-tenancy enforced in the application layer.
 - **Pagination:** PageNumber, PageSize (max **20**).
 - **Filtering:** title contains, description contains, status.
-- **Ordering:** DueDate ASC/DESC.
+- **Ordering:** tasks with a due date first, then DueDate ASC/DESC. Ties break by CreatedAt descending and id ascending, so pages stay stable.
 - Global exception-handling middleware.
 - Clear separation of concerns and logging.
 - **Observability (Phase 4):** JSON logs correlated with `traceId`, liveness versus readiness, application metrics, and opt-in OpenTelemetry export to Grafana Cloud. Not deployed on the current EC2 host. Design: [superpowers/specs/2026-10-27-phase4-observability-design.md](superpowers/specs/2026-10-27-phase4-observability-design.md).
@@ -231,6 +231,7 @@ The EC2 Compose host is replaced by Fargate. Design: [superpowers/specs/2026-11-
 
 ## 13. Document History
 
+- **2026-11-15:** `GET /api/tasks` lists tasks without a due date last in both orders. Pages that share a due date stay stable: newer tasks come first, then the smaller id.
 - **2026-11-13:** `POST /api/tasks` no longer accepts a status. Tasks are created as `Pending`, and a past due date returns `400 request.validation_failed` with `errors.DueDate`.
 - **2026-11-13:** Frontend prerequisites started on `feature/frontend-prereqs`. Done so far: task summary endpoint, due dates stored as normalized UTC, and an editable, clearable due date. A completed task returns `409 task.locked`. A past due date on update returns `400 task.due_date_in_past` only when the date changes. Design: [superpowers/specs/2026-11-13-frontend-prereqs-design.md](superpowers/specs/2026-11-13-frontend-prereqs-design.md).
 - **2026-11-10:** Browser CORS implemented on `feature/cors`. Allowed origins come from `Cors:AllowedOrigins`; Development allows `http://localhost:4200`. Design: [superpowers/specs/2026-11-10-cors-design.md](superpowers/specs/2026-11-10-cors-design.md). ALB HTTPS stays [superpowers/specs/2026-11-10-alb-https-design.md](superpowers/specs/2026-11-10-alb-https-design.md) and starts only after a subdomain exists.

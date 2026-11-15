@@ -350,8 +350,14 @@ public sealed class TaskUseCasesTests
                 query = query.Where(x => x.Status == status.Value);
 
             query = dueDateOrder == DueDateOrder.Descending
-                ? query.OrderByDescending(x => x.DueDate)
-                : query.OrderBy(x => x.DueDate);
+                ? query.OrderByDescending(x => x.DueDate.HasValue)
+                    .ThenByDescending(x => x.DueDate)
+                    .ThenByDescending(x => x.CreatedAt)
+                    .ThenBy(x => x.Id)
+                : query.OrderByDescending(x => x.DueDate.HasValue)
+                    .ThenBy(x => x.DueDate)
+                    .ThenByDescending(x => x.CreatedAt)
+                    .ThenBy(x => x.Id);
 
             var total = query.Count();
             var items = query.Skip((pageNumber - 1) * pageSize).Take(pageSize).ToList();

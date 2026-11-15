@@ -48,7 +48,7 @@ public interface ITaskRepository
     /// <param name="titleContains">Optional filter: title contains this string (case-insensitive).</param>
     /// <param name="descriptionContains">Optional filter: description contains this string (case-insensitive).</param>
     /// <param name="status">Optional filter: exact status.</param>
-    /// <param name="dueDateOrder">Order by due date ascending or descending.</param>
+    /// <param name="dueDateOrder">Order by due date ascending or descending. Tasks without a due date come last. Equal due dates break by creation time descending, then id ascending.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     System.Threading.Tasks.Task<PagedResult<DomainTask>> GetPagedAsync(
         Guid userId,

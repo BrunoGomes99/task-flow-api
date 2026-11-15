@@ -71,16 +71,32 @@ public sealed class TaskRepository : ITaskRepository
             filters.Add(builder.Eq(x => x.Status, status.Value));
 
         var filter = builder.And(filters);
-        var sort = dueDateOrder == DueDateOrder.Descending
-            ? Builders<TaskDocument>.Sort.Descending(x => x.DueDate)
-            : Builders<TaskDocument>.Sort.Ascending(x => x.DueDate);
+        var dueDateDirection = dueDateOrder == DueDateOrder.Descending ? -1 : 1;
+        var sort = new BsonDocument
+        {
+            { "hasDueDate", -1 },
+            { "DueDate", dueDateDirection },
+            { "CreatedAt", -1 },
+            { "_id", 1 }
+        };
 
         var totalCount = (int)await _tasks.CountDocumentsAsync(filter, cancellationToken: cancellationToken);
         var documents = await _tasks
-            .Find(filter)
+            .Aggregate()
+            .Match(filter)
+            .AppendStage<BsonDocument>(new BsonDocument("$addFields", new BsonDocument(
+                "hasDueDate",
+                new BsonDocument("$cond", new BsonArray
+                {
+                    new BsonDocument("$ne", new BsonArray { "$DueDate", BsonNull.Value }),
+                    1,
+                    0
+                }))))
             .Sort(sort)
+            .AppendStage<BsonDocument>(new BsonDocument("$unset", "hasDueDate"))
             .Skip((pageNumber - 1) * pageSize)
             .Limit(pageSize)
+            .As<TaskDocument>()
             .ToListAsync(cancellationToken);
 
         var items = documents.Select(TaskDocumentMapper.ToDomain).ToList();
