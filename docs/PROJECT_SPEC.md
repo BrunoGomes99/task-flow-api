@@ -119,7 +119,7 @@ Phase 1 stored only `Id`, `TaskId`, `EventType`, and `ProcessedAt`, and the enum
 
 ### Task
 
-4. Create task
+4. Create task (always `Pending`; a due date in the past is rejected)
 5. Get task by Id
 6. List tasks (paginated, filtered, ordered)
 7. Update task (title, description and due date; a completed task is locked; a past due date is rejected only when it changes)
@@ -231,6 +231,7 @@ The EC2 Compose host is replaced by Fargate. Design: [superpowers/specs/2026-11-
 
 ## 13. Document History
 
+- **2026-11-13:** `POST /api/tasks` no longer accepts a status. Tasks are created as `Pending`, and a past due date returns `400 request.validation_failed` with `errors.DueDate`.
 - **2026-11-13:** Frontend prerequisites started on `feature/frontend-prereqs`. Done so far: task summary endpoint, due dates stored as normalized UTC, and an editable, clearable due date. A completed task returns `409 task.locked`. A past due date on update returns `400 task.due_date_in_past` only when the date changes. Design: [superpowers/specs/2026-11-13-frontend-prereqs-design.md](superpowers/specs/2026-11-13-frontend-prereqs-design.md).
 - **2026-11-10:** Browser CORS implemented on `feature/cors`. Allowed origins come from `Cors:AllowedOrigins`; Development allows `http://localhost:4200`. Design: [superpowers/specs/2026-11-10-cors-design.md](superpowers/specs/2026-11-10-cors-design.md). ALB HTTPS stays [superpowers/specs/2026-11-10-alb-https-design.md](superpowers/specs/2026-11-10-alb-https-design.md) and starts only after a subdomain exists.
 - **2026-11-07:** Phase 5 replaces the EC2 Compose host with Fargate. Design: [superpowers/specs/2026-11-04-ecs-migration-design.md](superpowers/specs/2026-11-04-ecs-migration-design.md). Phase 4 liveness alias clarified. `GET /health` and `GET /health/live` stay equivalent in this phase, and existing curls keep `GET /health`. The ECS migration retargets those callers to `GET /health/live` and removes `GET /health`.

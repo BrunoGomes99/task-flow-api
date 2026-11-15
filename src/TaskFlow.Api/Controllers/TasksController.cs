@@ -77,7 +77,7 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
     {
         var userId = User.GetUserId();
         var result = await mediator.Send(
-            new CreateTaskCommand(userId, request.Title, request.Description, request.Status, request.DueDate),
+            new CreateTaskCommand(userId, request.Title, request.Description, request.DueDate),
             cancellationToken);
 
         if (!result.IsSuccess)

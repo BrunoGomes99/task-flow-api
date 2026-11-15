@@ -6,7 +6,6 @@ namespace TaskFlow.Api.Contracts;
 public sealed record CreateTaskRequest(
     string Title,
     string? Description,
-    DomainTaskStatus Status = DomainTaskStatus.Pending,
     DateTime? DueDate = null);
 
 public sealed record UpdateTaskRequest(string Title, string? Description, DateTime? DueDate = null);

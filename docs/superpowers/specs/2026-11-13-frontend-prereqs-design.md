@@ -82,7 +82,7 @@ The legibility of the logo on the purple e-mail header (`#5211A5`) must be check
 ## Success criteria
 
 - [x] `GET /api/tasks/summary` returns the three statuses and the total, zero when empty.
-- [ ] `POST /api/tasks` creates `pending` tasks and rejects a past `dueDate` with `errors.DueDate`.
+- [x] `POST /api/tasks` creates `pending` tasks and rejects a past `dueDate` with `errors.DueDate`.
 - [x] `PUT /api/tasks/{id}` changes and clears `dueDate`; an unchanged overdue date is accepted; a changed past date is rejected.
 - [x] `PUT /api/tasks/{id}` on a completed task returns `409 task.locked`.
 - [ ] Tasks without a due date are last in both orders, and pagination is stable.

@@ -28,13 +28,57 @@ public sealed class TaskUseCasesTests
         var userId = Guid.NewGuid();
 
         var result = await handler.Handle(
-            new CreateTaskCommand(userId, "Task title", "Task description", DomainTaskStatus.Pending, null),
+            new CreateTaskCommand(userId, "Task title", "Task description", null),
             CancellationToken.None);
 
         Assert.True(result.IsSuccess);
         var persisted = await repository.GetByIdAsync(userId, result.Value!.Id, CancellationToken.None);
         Assert.NotNull(persisted);
         Assert.Equal("Task title", persisted!.Title);
+        Assert.Equal(DomainTaskStatus.Pending, persisted.Status);
+    }
+
+    [Fact]
+    public void CreateTaskValidator_ShouldRejectPastDueDate()
+    {
+        var validator = new CreateTaskCommandValidator(new FixedTimeProvider(Now));
+
+        var result = validator.Validate(
+            new CreateTaskCommand(Guid.NewGuid(), "Task title", null, Now.UtcDateTime.AddSeconds(-1)));
+
+        Assert.Equal(nameof(CreateTaskCommand.DueDate), Assert.Single(result.Errors).PropertyName);
+    }
+
+    [Fact]
+    public void CreateTaskValidator_ShouldRejectDueDateEqualToNow()
+    {
+        var validator = new CreateTaskCommandValidator(new FixedTimeProvider(Now));
+
+        var result = validator.Validate(
+            new CreateTaskCommand(Guid.NewGuid(), "Task title", null, Now.UtcDateTime));
+
+        Assert.Equal(nameof(CreateTaskCommand.DueDate), Assert.Single(result.Errors).PropertyName);
+    }
+
+    [Fact]
+    public void CreateTaskValidator_ShouldAcceptEndOfTodayInLocalTime()
+    {
+        var validator = new CreateTaskCommandValidator(new FixedTimeProvider(Now));
+        var endOfTodayLocal = new DateTime(2026, 11, 14, 2, 59, 59, DateTimeKind.Utc);
+
+        var result = validator.Validate(new CreateTaskCommand(Guid.NewGuid(), "Task title", null, endOfTodayLocal));
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void CreateTaskValidator_ShouldAcceptMissingDueDate()
+    {
+        var validator = new CreateTaskCommandValidator(new FixedTimeProvider(Now));
+
+        var result = validator.Validate(new CreateTaskCommand(Guid.NewGuid(), "Task title", null, null));
+
+        Assert.True(result.IsValid);
     }
 
     [Fact]
