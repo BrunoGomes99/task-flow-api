@@ -22,3 +22,5 @@ variable "cors_allowed_origins" {
 }
 variable "rabbitmq_user" { type = string }
 variable "brevo_sender_name" { type = string }
+variable "web_base_url" { type = string }
+variable "reminder_email_logo_url" { type = string }

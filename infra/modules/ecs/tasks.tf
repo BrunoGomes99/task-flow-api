@@ -54,6 +54,8 @@ locals {
         { name = "RabbitMq__Port", value = "5672" },
         { name = "RabbitMq__User", value = var.rabbitmq_user },
         { name = "Brevo__SenderName", value = var.brevo_sender_name },
+        { name = "ReminderEmail__WebBaseUrl", value = var.web_base_url },
+        { name = "ReminderEmail__LogoUrl", value = var.reminder_email_logo_url },
         { name = "SERVICE_VERSION", value = var.notifications_image_tag },
       ])
       secrets = [

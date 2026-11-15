@@ -9,6 +9,7 @@ brevo_sender_email  = "you@example.com"
 atlas_connection_string = "mongodb+srv://taskflow:replace-this-password@cluster.example.mongodb.net/?retryWrites=true&w=majority"
 grafana_otlp_endpoint   = "https://otlp-gateway-prod-us-east-0.grafana.net/otlp"
 grafana_otlp_headers    = "Basic cmVwbGFjZTp0aGlz"
+web_base_url            = "https://your-project.pages.dev"
 
 # Optional overrides:
 # name_prefix         = "taskflow"

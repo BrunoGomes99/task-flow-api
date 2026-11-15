@@ -42,3 +42,8 @@ output "cluster_name" {
   description = "ECS cluster name."
   value       = module.ecs.cluster_name
 }
+
+output "reminder_email_logo_url" {
+  description = "Public URL of the reminder e-mail logo."
+  value       = module.s3.logo_url
+}

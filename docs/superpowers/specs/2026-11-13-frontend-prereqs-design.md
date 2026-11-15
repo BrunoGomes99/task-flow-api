@@ -69,7 +69,7 @@ The JSON already uses `JsonStringEnumConverter(JsonNamingPolicy.CamelCase)`. The
 
 ### D9 — Logo in a public S3 bucket
 
-Terraform module `email-assets` creates a dedicated bucket. Only objects under `email/*` are publicly readable through a bucket policy. The PNG is versioned in `infra/assets/email/` and uploaded by Terraform. The notifications task receives `ReminderEmail__LogoUrl` from the module output and `ReminderEmail__WebBaseUrl` from the root variable `web_base_url`.
+Terraform module `s3` creates a dedicated bucket. Only objects under `email/*` are publicly readable through a bucket policy. The PNG is versioned in `infra/assets/email/` and uploaded by Terraform. The notifications task receives `ReminderEmail__LogoUrl` from the module output and `ReminderEmail__WebBaseUrl` from the root variable `web_base_url`.
 
 The legibility of the logo on the purple e-mail header (`#5211A5`) must be checked before the first deploy. A light variant is a brand decision.
 
@@ -88,4 +88,4 @@ The legibility of the logo on the purple e-mail header (`#5211A5`) must be check
 - [x] Tasks without a due date are last in both orders, and pagination is stable.
 - [x] OpenAPI enums are camelCase strings.
 - [x] The reminder e-mail is HTML, shows the date in `America/Sao_Paulo`, encodes the title, and links to the app root.
-- [ ] Terraform publishes the logo under `email/*` and passes its URL to the notifications task.
+- [x] Terraform publishes the logo under `email/*` and passes its URL to the notifications task.
