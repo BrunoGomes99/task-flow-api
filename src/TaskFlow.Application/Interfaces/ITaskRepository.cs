@@ -48,7 +48,7 @@ public interface ITaskRepository
     /// <param name="titleContains">Optional filter: title contains this string (case-insensitive).</param>
     /// <param name="descriptionContains">Optional filter: description contains this string (case-insensitive).</param>
     /// <param name="status">Optional filter: exact status.</param>
-    /// <param name="dueDateOrder">Order by due date ascending or descending.</param>
+    /// <param name="dueDateOrder">Order by due date ascending or descending. Tasks without a due date come last. Equal due dates break by creation time descending, then id ascending.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     System.Threading.Tasks.Task<PagedResult<DomainTask>> GetPagedAsync(
         Guid userId,
@@ -58,5 +58,14 @@ public interface ITaskRepository
         string? descriptionContains,
         DomainTaskStatus? status,
         DueDateOrder dueDateOrder,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Counts all the user's tasks per status. Statuses without tasks may be absent from the result.
+    /// </summary>
+    /// <param name="userId">The owner user id (from JWT).</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    System.Threading.Tasks.Task<IReadOnlyDictionary<DomainTaskStatus, int>> CountByStatusAsync(
+        Guid userId,
         CancellationToken cancellationToken = default);
 }

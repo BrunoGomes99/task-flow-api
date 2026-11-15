@@ -19,6 +19,7 @@ builder.Services.AddControllers()
     });
 
 builder.Services.AddTaskFlowJwtAuthentication(builder.Configuration);
+builder.Services.AddTaskFlowCors(builder.Configuration);
 builder.Services.AddMediatR(cfg => cfg.RegisterServicesFromAssembly(typeof(TaskFlow.Application.UseCases.Tasks.CreateTask.CreateTaskCommand).Assembly));
 builder.Services.AddApplicationValidation();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -51,6 +52,8 @@ if (!app.Environment.IsDevelopment())
 {
     app.UseHttpsRedirection();
 }
+
+app.UseCors(CorsExtensions.PolicyName);
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

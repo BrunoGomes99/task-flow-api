@@ -2,6 +2,7 @@ using System.Reflection;
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using TaskFlow.Application.Behaviors;
 using TaskFlow.Application.Caching;
 using TaskFlow.Application.Interfaces;
@@ -17,7 +18,7 @@ public static class ServiceCollectionExtensions
     /// <summary>
     /// Registers all FluentValidation validators from the Application assembly, adds
     /// the TracingBehavior (outermost span, no-op unless a listener is attached) and the
-    /// ValidationBehavior to the MediatR pipeline, and registers task-cache invalidation.
+    /// ValidationBehavior to the MediatR pipeline, and registers task-cache invalidation and the system clock.
     /// </summary>
     public static IServiceCollection AddApplicationValidation(this IServiceCollection services)
     {
@@ -27,6 +28,7 @@ public static class ServiceCollectionExtensions
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(TracingBehavior<,>));
         services.AddTransient(typeof(IPipelineBehavior<,>), typeof(ValidationBehavior<,>));
         services.AddSingleton<ITaskCacheInvalidator, TaskCacheInvalidator>();
+        services.TryAddSingleton(TimeProvider.System);
 
         return services;
     }

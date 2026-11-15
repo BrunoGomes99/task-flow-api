@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lembrete TaskFlow</title>
+</head>
+<body style="margin:0; padding:0; background-color:#F4F2F8; font-family:Arial, Helvetica, sans-serif;">
+
+    <!-- Preheader: texto exibido na prévia da caixa de entrada -->
+    <div style="display:none; font-size:1px; color:#F4F2F8; line-height:1px; max-height:0; max-width:0; opacity:0; overflow:hidden;">
+        Sua tarefa {{taskName}} vence em cerca de 24 horas.
+    </div>
+
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0"
+           border="0" style="background-color:#F4F2F8;">
+        <tr>
+            <td align="center" style="padding:32px 16px;">
+
+                <table role="presentation" width="600" cellspacing="0" cellpadding="0"
+                       border="0" style="width:100%; max-width:600px;">
+
+                    <!-- Cabeçalho -->
+                    <tr>
+                        <td align="center"
+                            style="background-color:#5211A5; padding:28px 20px; border-radius:12px 12px 0 0;">
+
+                            <img src="{{logoUrl}}"
+                                 alt="TaskFlow"
+                                 width="170"
+                                 style="display:block; width:170px; max-width:100%;
+                                        height:auto; border:0;">
+
+                        </td>
+                    </tr>
+
+                    <!-- Conteúdo -->
+                    <tr>
+                        <td style="background-color:#FFFFFF; padding:36px 32px;">
+
+                            <!-- Identificação do lembrete -->
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td style="background-color:#FFF4E5; color:#B76B12;
+                                               padding:7px 12px; border-radius:20px;
+                                               font-size:12px; font-weight:bold;">
+                                        &#9200; LEMBRETE DE VENCIMENTO
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <h1 style="color:#292333; font-size:24px;
+                                       line-height:32px; margin:24px 0 12px;">
+                                Sua tarefa está chegando ao prazo!
+                            </h1>
+
+                            <p style="color:#625C6B; font-size:15px;
+                                      line-height:24px; margin:0 0 24px;">
+                                Olá!
+                                <br><br>
+                                Passando para lembrar que uma das suas tarefas
+                                cadastradas no TaskFlow está prestes a vencer.
+                            </p>
+
+                            <!-- Card da tarefa -->
+                            <table role="presentation" width="100%" cellspacing="0"
+                                   cellpadding="0" border="0"
+                                   style="background-color:#F7F1FF;
+                                          border:1px solid #E8D5FF;
+                                          border-radius:10px;">
+
+                                <tr>
+                                    <td style="padding:22px 20px;">
+
+                                        <p style="color:#77717F; font-size:12px;
+                                                  font-weight:bold; text-transform:uppercase;
+                                                  margin:0 0 8px;">
+                                            Nome da tarefa
+                                        </p>
+
+                                        <p style="color:#6725B8; font-size:19px;
+                                                  font-weight:bold; line-height:27px;
+                                                  margin:0 0 20px;">
+                                            {{taskName}}
+                                        </p>
+
+                                        <table role="presentation" width="100%"
+                                               cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="border-top:1px solid #E5D7F3;
+                                                           padding-top:16px;">
+                                                    <p style="color:#625C6B;
+                                                              font-size:13px; margin:0;">
+                                                        Data de vencimento
+                                                    </p>
+                                                </td>
+                                                <td align="right"
+                                                    style="border-top:1px solid #E5D7F3;
+                                                           padding-top:16px;">
+                                                    <p style="color:#6725B8;
+                                                              font-size:15px;
+                                                              font-weight:bold;
+                                                              margin:0;">
+                                                        {{dueDate}}
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color:#625C6B; font-size:15px;
+                                      line-height:24px; margin:24px 0;">
+                                Ainda dá tempo de concluir!
+                                Acesse sua tarefa e acompanhe o progresso
+                                para não perder o prazo.
+                            </p>
+
+                            <!-- Botão de acesso -->
+                            <table role="presentation" cellspacing="0"
+                                   cellpadding="0" border="0" align="center">
+                                <tr>
+                                    <td align="center"
+                                        style="background-color:#7925CB;
+                                               border-radius:8px;">
+                                        <a href="{{taskUrl}}"
+                                           target="_blank"
+                                           style="display:inline-block;
+                                                  padding:14px 28px;
+                                                  color:#FFFFFF;
+                                                  font-size:14px;
+                                                  font-weight:bold;
+                                                  text-decoration:none;">
+                                            Acessar minha tarefa &#8594;
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="color:#77717F; font-size:13px;
+                                      line-height:21px; text-align:center;
+                                      margin:28px 0 0;">
+                                Organize suas atividades e mantenha tudo
+                                em dia com o TaskFlow.
+                            </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- Rodapé -->
+                    <tr>
+                        <td align="center"
+                            style="background-color:#29133F;
+                                   padding:26px 20px;
+                                   border-radius:0 0 12px 12px;">
+
+                            <p style="color:#E9D5FF; font-size:18px;
+                                      font-weight:bold; margin:0 0 12px;">
+                                TaskFlow
+                            </p>
+
+                            <p style="color:#C9B5DA; font-size:12px;
+                                      line-height:20px; margin:0 0 10px;">
+                                Este é um e-mail automático.
+                                Por favor, não responda a esta mensagem.
+                            </p>
+
+                            <p style="color:#A88BBF; font-size:11px; margin:0;">
+                                &copy; 2026 TaskFlow. Todos os direitos reservados.
+                            </p>
+
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

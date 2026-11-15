@@ -8,6 +8,7 @@ using TaskFlow.Application.DTOs;
 using TaskFlow.Application.UseCases.Tasks.CreateTask;
 using TaskFlow.Application.UseCases.Tasks.DeleteTask;
 using TaskFlow.Application.UseCases.Tasks.GetTaskById;
+using TaskFlow.Application.UseCases.Tasks.GetTaskSummary;
 using TaskFlow.Application.UseCases.Tasks.ListTasks;
 using TaskFlow.Application.UseCases.Tasks.UpdateTask;
 using TaskFlow.Application.UseCases.Tasks.UpdateTaskStatus;
@@ -43,6 +44,17 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
         return FromResult(result);
     }
 
+    [HttpGet("summary")]
+    [ProducesResponseType(typeof(TaskSummaryDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Summary(CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        var result = await mediator.Send(new GetTaskSummaryQuery(userId), cancellationToken);
+
+        return FromResult(result);
+    }
+
     [HttpGet("{taskId:guid}")]
     [ProducesResponseType(typeof(TaskDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
@@ -65,7 +77,7 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
     {
         var userId = User.GetUserId();
         var result = await mediator.Send(
-            new CreateTaskCommand(userId, request.Title, request.Description, request.Status, request.DueDate),
+            new CreateTaskCommand(userId, request.Title, request.Description, request.DueDate),
             cancellationToken);
 
         if (!result.IsSuccess)
@@ -79,6 +91,7 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
+    [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Update(
         Guid taskId,
         [FromBody] UpdateTaskRequest request,
@@ -86,7 +99,7 @@ public sealed class TasksController(IMediator mediator) : TaskFlowControllerBase
     {
         var userId = User.GetUserId();
         var result = await mediator.Send(
-            new UpdateTaskCommand(userId, taskId, request.Title, request.Description),
+            new UpdateTaskCommand(userId, taskId, request.Title, request.Description, request.DueDate),
             cancellationToken);
 
         return FromResult(result);

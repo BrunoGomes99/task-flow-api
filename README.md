@@ -7,6 +7,7 @@ A RESTful task-management API built with **.NET 10** and **Clean Architecture**.
 - **User** — Register, login (JWT), get profile
 - **Tasks** — Full CRUD, paginated list (filters: title, description, status; sort by due date)
 - **Auth** — JWT (no ASP.NET Identity), BCrypt password hashing, multi-tenancy via `UserId` from token
+- **Browser clients** — Cross-origin calls are allowed only from `Cors:AllowedOrigins`. Development allows `http://localhost:4200`.
 - **Phase 2** — GitHub Actions CI + ECR publish behind Environment `production`; Terraform AWS study stack (ECR + the ECS design). Design: [docs/superpowers/specs/2026-11-04-ecs-migration-design.md](docs/superpowers/specs/2026-11-04-ecs-migration-design.md)
 - **Phase 3 cache** — Redis Cache Aside on get-task-by-id (60 second absolute TTL)
 - **Phase 3 due reminder** — About 24 hours before `DueDate`, a scheduler worker publishes `DueSoon`; a notifications worker sends one Brevo email and stores `NotificationLog` as the receipt. Design: [docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md](docs/superpowers/specs/2026-10-16-phase3-due-reminder-design.md)
@@ -60,7 +61,7 @@ The API will listen on the configured port (e.g. `http://localhost:5000`).
 docker-compose up -d
 ```
 
-Starts the API, MongoDB, Redis, RabbitMQ, and the scheduler and notifications workers. Redis port `6379` and AMQP port `5672` are not published. The API reaches Redis as `redis:6379`. RabbitMQ management UI: `http://localhost:15672` (user and password from `.env`). Set `BREVO_API_KEY` and `BREVO_SENDER_EMAIL` in `.env` or the notifications worker will not stay up. Health check: `GET /health/live`. A Redis outage does not fail get-by-id: the handler reads MongoDB. Local Compose also starts Redis Commander at `http://localhost:8083` (basic auth from `.env`) to browse cache keys. That UI is not part of the AWS stack.
+Starts the API, MongoDB, Redis, RabbitMQ, and the scheduler and notifications workers. Redis port `6379` and AMQP port `5672` are not published. The API reaches Redis as `redis:6379`. RabbitMQ management UI: `http://localhost:15672` (user and password from `.env`). Set `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, and `REMINDER_EMAIL_LOGO_URL` in `.env` or the notifications worker will not stay up. `REMINDER_EMAIL_WEB_BASE_URL` defaults to `http://localhost:4200`. Health check: `GET /health/live`. A Redis outage does not fail get-by-id: the handler reads MongoDB. Local Compose also starts Redis Commander at `http://localhost:8083` (basic auth from `.env`) to browse cache keys. That UI is not part of the AWS stack.
 
 ### Run tests
 
@@ -131,5 +132,7 @@ tests/
 - [Phase 3 cache plan](docs/superpowers/plans/2026-10-14-phase3-cache.md) — Implementation notes for the Redis slice  
 - [CI/CD implementation plan](docs/superpowers/plans/2026-08-02-ci-cd-implementation.md) — Task breakdown for branch `feature/ci-cd-implementation`  
 - [Infrastructure (Terraform)](infra/README.md) — Auth, S3 state, apply/destroy, ECR publish, ECS
-- [ECS migration design](docs/superpowers/specs/2026-11-04-ecs-migration-design.md) — Phase 5: Fargate, ALB, Atlas, Service Connect  
+- [ECS migration design](docs/superpowers/specs/2026-11-04-ecs-migration-design.md) — Phase 5: Fargate, ALB, Atlas, Service Connect
+- [Browser CORS design](docs/superpowers/specs/2026-11-10-cors-design.md) — Allowed browser origins for a separate Angular app. Plan: [2026-11-10-cors.md](docs/superpowers/plans/2026-11-10-cors.md)
+- [ALB HTTPS design](docs/superpowers/specs/2026-11-10-alb-https-design.md) — TLS on the existing ALB, after a subdomain exists. Approved, not started. Plan: [2026-11-10-alb-https.md](docs/superpowers/plans/2026-11-10-alb-https.md)  
 
