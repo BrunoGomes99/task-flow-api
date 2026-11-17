@@ -120,7 +120,7 @@ Domain, Application, Infrastructure, API, and Test projects (e.g. `TaskFlow.Doma
 ## Current Notes / Known Deviations (Keep Honest)
 
 - **Use-case vs controller responsibility for 404**: Some controllers currently return `NotFound()` when a use case returns `null` (e.g. `GetTaskById`, `GetCurrentUserProfile`). Prefer a single approach: either (a) Application throws `NotFoundException` and API relies on global mapping, or (b) Application returns `null` and controllers handle it. Avoid mixing styles within the same bounded context.
-- **Docker / HTTPS**: `docker-compose.override.yml` runs the API container on **HTTP only** (no HTTPS listener inside the container). Production-style TLS is expected to terminate at a reverse proxy or Ingress (see project discussions). `UseHttpsRedirection()` is skipped in **Development** so local container runs do not require a dev certificate inside the image.
+- **Docker / HTTPS**: `docker-compose.yml` runs the API container on **HTTP only** (no HTTPS listener inside the container). Production-style TLS is expected to terminate at a reverse proxy or Ingress (see project discussions). `UseHttpsRedirection()` is skipped in **Development** so local container runs do not require a dev certificate inside the image.
 
 ### Testing (Phase 1)
 

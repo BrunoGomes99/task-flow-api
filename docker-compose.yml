@@ -6,12 +6,15 @@ services:
       dockerfile: src/TaskFlow.Api/Dockerfile
     restart: unless-stopped
     environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       ASPNETCORE_HTTP_PORTS: "8080"
       MongoDb__ConnectionString: mongodb://${MONGO_ROOT_USERNAME:-root}:${MONGO_ROOT_PASSWORD:-example}@mongo:27017/?authSource=admin
       Redis__ConnectionString: redis:6379,abortConnect=false
       OpenTelemetry__Enabled: ${OTEL_ENABLED:-false}
       OpenTelemetry__OtlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-}
       OpenTelemetry__Headers: ${OTEL_EXPORTER_OTLP_HEADERS:-}
+    ports:
+      - "${API_HTTP_HOST_PORT:-8080}:8080"
     depends_on:
       mongo:
         condition: service_healthy

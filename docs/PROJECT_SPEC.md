@@ -241,7 +241,7 @@ The EC2 Compose host is replaced by Fargate. Design: [superpowers/specs/2026-11-
 - **2026-10-14:** Phase 3 cache implemented: Cache Aside on `GetTaskById`, absolute 60s TTL, three delete retries, no cache-repair queue. Redis is in local Compose and in the EC2 Compose file (unpublished, memory-capped). See [superpowers/specs/2026-10-14-phase3-cache-design.md](superpowers/specs/2026-10-14-phase3-cache-design.md) and [superpowers/plans/2026-10-14-phase3-cache.md](superpowers/plans/2026-10-14-phase3-cache.md).
 - **2026-08-10:** Phase 2 Terraform hardening: assume `terraform-deploy-role` + S3 remote state with `use_lockfile` (plan Task 3; former ECR/compute tasks renumbered).
 - **2026-08-02:** Swapped former Phase 2 (Cache/Messaging) and Phase 3 (CI/CD). Phase 2 is now CI/CD with ECR + EC2 + Terraform; Cache/Messaging becomes Phase 3. See CI/CD design spec.
-- Phase 1 Docker stack and healthchecks aligned with repo (`docker-compose.yml`, `docker-compose.override.yml`, API `Dockerfile`); see Engineering Guidelines “Docker and Environment”.
+- Phase 1 Docker stack and healthchecks aligned with repo (`docker-compose.yml`, API `Dockerfile`); see Engineering Guidelines “Docker and Environment”.
 - Initial specification based on TaskFlow project plan and approved scope refinements (phases, PageSize 20, health checks, validation in Application layer).
 - Added MediatR, CQRS (Commands/Queries), and FluentValidation to architecture and Phase 1 stack.
 - Login response: documented `ExpiresIn` (seconds); refresh tokens explicitly deferred to a later version.
