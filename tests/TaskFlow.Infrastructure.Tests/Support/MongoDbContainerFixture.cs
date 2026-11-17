@@ -4,7 +4,7 @@ namespace TaskFlow.Infrastructure.Tests.Support;
 
 /// <summary>
 /// Shared MongoDB container for Infrastructure integration tests (one container per test collection).
-/// Image tag matches local docker-compose (<c>mongo:8.0.30</c>).
+/// Image tag matches local docker-compose (<c>mongo:8.0.38</c>).
 /// </summary>
 public sealed class MongoDbContainerFixture : IAsyncLifetime
 {
@@ -18,12 +18,7 @@ public sealed class MongoDbContainerFixture : IAsyncLifetime
 
     public async Task InitializeAsync()
     {
-        // 8.0.30 exits when uname reports 6.19 through 7.0.13 (SERVER-121912).
-        // GitHub-hosted Ubuntu labels the fixed 7.0.14 kernel as 7.0.0, so the check refuses a good kernel.
-        // Letting glibc register rseq first turns off TCMalloc's per-CPU caches and skips that exit.
-        _container = new MongoDbBuilder("mongo:8.0.30")
-            .WithEnvironment("GLIBC_TUNABLES", "glibc.pthread.rseq=1")
-            .Build();
+        _container = new MongoDbBuilder("mongo:8.0.38").Build();
 
         await _container.StartAsync();
     }
